@@ -13,6 +13,7 @@ interface DogProfileData {
     intensity: Record<string, number>
   }
   equipment?: string[]
+  equipment_keys?: string[]
 }
 
 export async function upsertDogProfile(profileData: DogProfileData) {
@@ -49,7 +50,8 @@ export async function upsertDogProfile(profileData: DogProfileData) {
         health_values: profileData.health_values,
         performance_values: profileData.performance_values,
         preferences: profileData.preferences,
-        equipment: profileData.equipment
+        equipment: profileData.equipment,
+        equipment_keys: profileData.equipment_keys
       })
       .eq('user_id', userId)
       .select()
@@ -69,7 +71,8 @@ export async function upsertDogProfile(profileData: DogProfileData) {
         health_values: profileData.health_values,
         performance_values: profileData.performance_values,
         preferences: profileData.preferences,
-        equipment: profileData.equipment
+        equipment: profileData.equipment,
+        equipment_keys: profileData.equipment_keys
       })
       .select()
     

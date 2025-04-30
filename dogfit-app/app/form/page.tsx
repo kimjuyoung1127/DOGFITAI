@@ -26,6 +26,8 @@ import { useToast } from "@/components/ui/use-toast"
 import { insertDogProfile } from "@/lib/supabase/insertDogProfile"
 import { getDogProfile } from "@/lib/supabase/getDogProfile"
 import { upsertDogProfile } from "@/lib/supabase/upsertDogProfile"
+import { supabase } from "@/lib/supabase/supabaseClient"
+
 
 export default function DogInfoForm() {
   const router = useRouter()
@@ -90,6 +92,9 @@ export default function DogInfoForm() {
     platform_board: false,
   })
 
+  // 운동기구 목록을 Supabase에서 불러오는 함수
+  const [equipmentList, setEquipmentList] = useState(equipmentItems)
+
   useEffect(() => {
     // Load profiles from localStorage
     const storedProfiles = getLocalStorageItem<DogProfile[]>("dogfit-profiles", [])
@@ -150,6 +155,17 @@ export default function DogInfoForm() {
               }));
             }
           }
+          
+          // 운동기구 선택 정보 설정
+          if (profile.equipment_keys && Array.isArray(profile.equipment_keys)) {
+            const updatedSelectedEquipment = { ...selectedEquipment };
+            profile.equipment_keys.forEach((key: string) => {
+              if (updatedSelectedEquipment.hasOwnProperty(key)) {
+                updatedSelectedEquipment[key] = true;
+              }
+            });
+            setSelectedEquipment(updatedSelectedEquipment);
+          }
         }
       } catch (e) {
         console.error("프로필 데이터 불러오기 중 오류 발생:", e)
@@ -157,6 +173,32 @@ export default function DogInfoForm() {
     }
     
     loadProfileData()
+  }, [])
+
+  useEffect(() => {
+    const fetchEquipments = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('equipments')
+          .select('*')
+        
+        if (error) {
+          console.error("운동기구 목록 불러오기 실패:", error.message)
+          return
+        }
+        
+        if (data && data.length > 0) {
+          // 운동기구 목록 업데이트
+          // 여기서는 기존 equipmentItems를 사용하고 있지만,
+          // 실제로는 Supabase에서 불러온 데이터로 대체할 수 있습니다.
+          // setEquipmentList(data)
+        }
+      } catch (e) {
+        console.error("운동기구 목록 불러오기 중 오류 발생:", e)
+      }
+    }
+    
+    fetchEquipments()
   }, [])
 
   const handleProfileSelect = (profileId: number) => {
@@ -228,155 +270,122 @@ export default function DogInfoForm() {
   }
 
   const handleNext = async () => {
-    // 2단계에서 다음으로 넘어갈 때 건강 정보 저장
-    if (step === 2) {
-      setIsSaving(true)
-      
-      try {
-        const profileData = {
-          name: dogInfo.name,
-          sex: dogInfo.gender,
-          age: Math.round(dogInfo.age * 12), // 년 단위를 월 단위로 변환
-          weight: dogInfo.weight,
-          breed: dogInfo.breed,
-          health_values: healthValues
-        }
-
-        const { error } = await upsertDogProfile(profileData)
-
-        if (error) {
-          console.error("건강 정보 저장 실패:", error.message)
-          toast({
-            title: "❌ 건강 정보 저장 실패",
-            description: "다시 시도해주세요.",
-            variant: "destructive",
-          })
-          return // 에러 발생 시 다음 단계로 넘어가지 않음
-        }
-        
+    // 각 단계별 유효성 검사만 수행하고, 저장은 하지 않음
+    if (step === 1) {
+      // 기본 정보 유효성 검사
+      if (!dogInfo.name) {
         toast({
-          title: "✅ 건강 정보가 저장되었습니다!",
-          description: "반려견 건강 정보가 성공적으로 저장되었습니다.",
-          variant: "default",
-        })
-      } catch (e) {
-        console.error("건강 정보 저장 중 오류 발생:", e)
-        toast({
-          title: "❌ 오류 발생",
-          description: "건강 정보 저장 중 오류가 발생했습니다.",
+          title: "❌ 이름을 입력해주세요",
+          description: "반려견 이름은 필수 입력 항목입니다.",
           variant: "destructive",
         })
-        return // 에러 발생 시 다음 단계로 넘어가지 않음
-      } finally {
-        setIsSaving(false)
+        return
+      }
+      
+      if (!dogInfo.gender) {
+        toast({
+          title: "❌ 성별을 선택해주세요",
+          description: "반려견 성별은 필수 선택 항목입니다.",
+          variant: "destructive",
+        })
+        return
+      }
+      
+      if (!dogInfo.breed) {
+        toast({
+          title: "❌ 견종을 선택해주세요",
+          description: "반려견 견종은 필수 선택 항목입니다.",
+          variant: "destructive",
+        })
+        return
       }
     }
     
-    // 3단계에서 다음으로 넘어갈 때 운동 능력 정보 저장
-    if (step === 3) {
-      setIsSaving(true)
+    // 다음 단계로 이동
+    if (step < 5) {
+      setStep(step + 1)
+    } else {
+      // Step 5에서는 전체 데이터를 저장하고 결과 페이지로 이동
+      await saveFullProfile()
+    }
+  }
+
+  // 전체 프로필 저장 함수
+  const saveFullProfile = async () => {
+    setIsLoading(true)
+    
+    try {
+      // 선택된 활동 목록 생성
+      const selectedActivitiesList = Object.keys(selectedActivities).filter(
+        activity => selectedActivities[activity]
+      )
       
-      try {
-        const profileData = {
-          name: dogInfo.name,
-          sex: dogInfo.gender,
-          age: Math.round(dogInfo.age * 12),
-          weight: dogInfo.weight,
-          breed: dogInfo.breed,
-          health_values: healthValues,
-          performance_values: performanceValues
-        }
-
-        const { error } = await upsertDogProfile(profileData)
-
-        if (error) {
-          console.error("운동 능력 정보 저장 실패:", error.message)
-          toast({
-            title: "❌ 운동 능력 정보 저장 실패",
-            description: "다시 시도해주세요.",
-            variant: "destructive",
-          })
-          return // 에러 발생 시 다음 단계로 넘어가지 않음
-        }
-        
+      // 선택된 운동기구 목록 생성
+      const selectedEquipmentList = Object.keys(selectedEquipment).filter(
+        key => selectedEquipment[key]
+      )
+      
+      // 최종 프로필 데이터 구성
+      const profileData = {
+        name: dogInfo.name,
+        sex: dogInfo.gender,
+        age: Math.round(dogInfo.age * 12), // 년 단위를 월 단위로 변환
+        weight: dogInfo.weight,
+        breed: dogInfo.breed,
+        health_values: healthValues,
+        performance_values: performanceValues,
+        preferences: {
+          selected: selectedActivitiesList,
+          intensity: intensities
+        },
+        equipment_keys: selectedEquipmentList
+      }
+      
+      // Supabase에 저장
+      const { data, error } = await upsertDogProfile(profileData)
+      
+      if (error) {
+        console.error("프로필 저장 실패:", error.message)
         toast({
-          title: "✅ 운동 능력 정보가 저장되었습니다!",
-          description: "반려견 운동 능력 정보가 성공적으로 저장되었습니다.",
-          variant: "default",
-        })
-      } catch (e) {
-        console.error("운동 능력 정보 저장 중 오류 발생:", e)
-        toast({
-          title: "❌ 오류 발생",
-          description: "운동 능력 정보 저장 중 오류가 발생했습니다.",
+          title: "❌ 프로필 저장 실패",
+          description: "다시 시도해주세요.",
           variant: "destructive",
         })
-        return // 에러 발생 시 다음 단계로 넘어가지 않음
-      } finally {
-        setIsSaving(false)
+        setIsLoading(false)
+        return false
       }
-    }
-    
-    // 4단계에서 다음으로 넘어갈 때 활동 선호도 저장
-    if (step === 4) {
-      setIsSaving(true)
       
-      try {
-        // 선택된 활동 목록 생성
-        const selectedActivitiesList = Object.keys(selectedActivities).filter(
-          activity => selectedActivities[activity]
-        );
-        
-        const profileData = {
-          name: dogInfo.name,
-          sex: dogInfo.gender,
-          age: Math.round(dogInfo.age * 12),
-          weight: dogInfo.weight,
-          breed: dogInfo.breed,
-          health_values: healthValues,
-          performance_values: performanceValues,
-          preferences: {
-            selected: selectedActivitiesList,
-            intensity: intensities
-          }
-        }
-
-        const { error } = await upsertDogProfile(profileData)
-
-        if (error) {
-          console.error("활동 선호도 저장 실패:", error.message)
-          toast({
-            title: "❌ 활동 선호도 저장 실패",
-            description: "다시 시도해주세요.",
-            variant: "destructive",
-          })
-          return // 에러 발생 시 다음 단계로 넘어가지 않음
-        }
-        
-        toast({
-          title: "✅ 활동 선호도가 저장되었습니다!",
-          description: "반려견 활동 선호도가 성공적으로 저장되었습니다.",
-          variant: "default",
-        })
-      } catch (e) {
-        console.error("활동 선호도 저장 중 오류 발생:", e)
-        toast({
-          title: "❌ 오류 발생",
-          description: "활동 선호도 저장 중 오류가 발생했습니다.",
-          variant: "destructive",
-        })
-        return // 에러 발생 시 다음 단계로 넘어가지 않음
-      } finally {
-        setIsSaving(false)
-      }
+      // 로컬 스토리지에도 저장
+      setLocalStorageItem("dogfit-dog-info", { 
+        ...dogInfo, 
+        healthValues, 
+        performance: performanceValues, 
+        preferences: { 
+          selected: selectedActivitiesList, 
+          intensity: intensities 
+        },
+        equipment: selectedEquipmentList
+      })
+      
+      toast({
+        title: "✅ 프로필이 저장되었습니다!",
+        description: "반려견 정보가 성공적으로 저장되었습니다.",
+        variant: "default",
+      })
+      
+      // 결과 페이지로 이동
+      router.push("/result")
+      return true
+    } catch (e) {
+      console.error("프로필 저장 중 오류 발생:", e)
+      toast({
+        title: "❌ 오류 발생",
+        description: "프로필 저장 중 오류가 발생했습니다.",
+        variant: "destructive",
+      })
+      setIsLoading(false)
+      return false
     }
-    
-    // 1단계에서 프로필 저장 기능은 유지
-    if (step === 1 && isSaveProfileChecked) {
-      await handleSaveProfile()
-    }
-    
-    setStep(step + 1)
   }
 
   const handleBack = () => {
@@ -384,24 +393,7 @@ export default function DogInfoForm() {
   }
 
   const handleSubmit = () => {
-    setIsLoading(true)
-    // Save dog info to localStorage
-    setLocalStorageItem("dogfit-dog-info", { 
-      ...dogInfo, 
-      healthValues, 
-      performance: performanceValues, 
-      preferences: { 
-        selected: Object.keys(selectedActivities).filter(activity => selectedActivities[activity]), 
-        intensity: intensities 
-      },
-      equipment: Object.keys(selectedEquipment).filter(key => selectedEquipment[key])
-    })
-
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false)
-      router.push("/result")
-    }, 2000)
+    saveFullProfile()
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -871,8 +863,8 @@ export default function DogInfoForm() {
                             className="w-full h-2 bg-orange-200 rounded-lg appearance-none cursor-pointer accent-orange-500"
                           />
                           <div className="mt-2 flex justify-between text-xs text-orange-600">
-                            <span>약함</span>
-                            <span>강함</span>
+                            <span>잘함</span>
+                            <span>잘 못함</span>
                           </div>
                         </div>
                       )}
@@ -930,17 +922,13 @@ export default function DogInfoForm() {
               <div></div>
             )}
 
-            {step === 1 && (
-              <Button 
-                onClick={handleSaveProfile} 
-                disabled={isSaving || isSaved}
-                className={`ml-4 ${isSaved ? 'bg-gray-400' : ''}`}
-              >
-                {isSaving ? "저장 중..." : isSaved ? "저장됨" : "📋 프로필 저장하기"}
+            {step < 5 ? (
+              <Button onClick={handleNext}>다음</Button>
+            ) : (
+              <Button onClick={handleSubmit} disabled={isLoading}>
+                {isLoading ? "저장 중..." : "완료"}
               </Button>
             )}
-
-            {step < 5 ? <Button onClick={handleNext}>다음</Button> : <Button onClick={handleSubmit}>완료</Button>}
           </CardFooter>
         </Card>
       </motion.div>
