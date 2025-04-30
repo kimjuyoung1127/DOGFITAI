@@ -123,6 +123,33 @@ export default function DogInfoForm() {
           if (profile.health_values) {
             setHealthValues(profile.health_values)
           }
+          
+          // 운동 능력 정보 설정
+          if (profile.performance_values) {
+            setPerformanceValues(profile.performance_values)
+          }
+          
+          // 활동 선호도 설정
+          if (profile.preferences) {
+            // 선택된 활동 설정
+            if (profile.preferences.selected) {
+              const updatedSelectedActivities = { ...selectedActivities };
+              profile.preferences.selected.forEach((activity: string) => {
+                if (updatedSelectedActivities.hasOwnProperty(activity)) {
+                  updatedSelectedActivities[activity] = true;
+                }
+              });
+              setSelectedActivities(updatedSelectedActivities);
+            }
+            
+            // 강도 설정
+            if (profile.preferences.intensity) {
+              setIntensities(prevIntensities => ({
+                ...prevIntensities,
+                ...profile.preferences.intensity
+              }));
+            }
+          }
         }
       } catch (e) {
         console.error("프로필 데이터 불러오기 중 오류 발생:", e)
@@ -160,7 +187,13 @@ export default function DogInfoForm() {
       age: Math.round(dogInfo.age * 12), // Convert to months
       weight: dogInfo.weight,
       breed: dogInfo.breed,
-      health_values: healthValues // 건강 정보도 함께 저장
+      health_values: healthValues, // 건강 정보도 함께 저장
+      performance_values: performanceValues, // 운동 능력 정보도 함께 저장
+      preferences: {
+        selected: Object.keys(selectedActivities).filter(activity => selectedActivities[activity]),
+        intensity: intensities
+      },
+      equipment: Object.keys(selectedEquipment).filter(key => selectedEquipment[key])
     }
 
     try {
@@ -231,6 +264,105 @@ export default function DogInfoForm() {
         toast({
           title: "❌ 오류 발생",
           description: "건강 정보 저장 중 오류가 발생했습니다.",
+          variant: "destructive",
+        })
+        return // 에러 발생 시 다음 단계로 넘어가지 않음
+      } finally {
+        setIsSaving(false)
+      }
+    }
+    
+    // 3단계에서 다음으로 넘어갈 때 운동 능력 정보 저장
+    if (step === 3) {
+      setIsSaving(true)
+      
+      try {
+        const profileData = {
+          name: dogInfo.name,
+          sex: dogInfo.gender,
+          age: Math.round(dogInfo.age * 12),
+          weight: dogInfo.weight,
+          breed: dogInfo.breed,
+          health_values: healthValues,
+          performance_values: performanceValues
+        }
+
+        const { error } = await upsertDogProfile(profileData)
+
+        if (error) {
+          console.error("운동 능력 정보 저장 실패:", error.message)
+          toast({
+            title: "❌ 운동 능력 정보 저장 실패",
+            description: "다시 시도해주세요.",
+            variant: "destructive",
+          })
+          return // 에러 발생 시 다음 단계로 넘어가지 않음
+        }
+        
+        toast({
+          title: "✅ 운동 능력 정보가 저장되었습니다!",
+          description: "반려견 운동 능력 정보가 성공적으로 저장되었습니다.",
+          variant: "default",
+        })
+      } catch (e) {
+        console.error("운동 능력 정보 저장 중 오류 발생:", e)
+        toast({
+          title: "❌ 오류 발생",
+          description: "운동 능력 정보 저장 중 오류가 발생했습니다.",
+          variant: "destructive",
+        })
+        return // 에러 발생 시 다음 단계로 넘어가지 않음
+      } finally {
+        setIsSaving(false)
+      }
+    }
+    
+    // 4단계에서 다음으로 넘어갈 때 활동 선호도 저장
+    if (step === 4) {
+      setIsSaving(true)
+      
+      try {
+        // 선택된 활동 목록 생성
+        const selectedActivitiesList = Object.keys(selectedActivities).filter(
+          activity => selectedActivities[activity]
+        );
+        
+        const profileData = {
+          name: dogInfo.name,
+          sex: dogInfo.gender,
+          age: Math.round(dogInfo.age * 12),
+          weight: dogInfo.weight,
+          breed: dogInfo.breed,
+          health_values: healthValues,
+          performance_values: performanceValues,
+          preferences: {
+            selected: selectedActivitiesList,
+            intensity: intensities
+          }
+        }
+
+        const { error } = await upsertDogProfile(profileData)
+
+        if (error) {
+          console.error("활동 선호도 저장 실패:", error.message)
+          toast({
+            title: "❌ 활동 선호도 저장 실패",
+            description: "다시 시도해주세요.",
+            variant: "destructive",
+          })
+          return // 에러 발생 시 다음 단계로 넘어가지 않음
+        }
+        
+        toast({
+          title: "✅ 활동 선호도가 저장되었습니다!",
+          description: "반려견 활동 선호도가 성공적으로 저장되었습니다.",
+          variant: "default",
+        })
+      } catch (e) {
+        console.error("활동 선호도 저장 중 오류 발생:", e)
+        toast({
+          title: "❌ 오류 발생",
+          description: "활동 선호도 저장 중 오류가 발생했습니다.",
           variant: "destructive",
         })
         return // 에러 발생 시 다음 단계로 넘어가지 않음
