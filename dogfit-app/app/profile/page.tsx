@@ -309,37 +309,70 @@ export default function ProfilePage() {
 
   // Function to handle exercise recommendation
   const handleExerciseRecommendation = (profileId: number) => {
-    // Find the selected profile
-    const profile = profiles.find(p => p.id === profileId)
+    // 중복 클릭 방지
+    if (isLoading) return;
     
-    if (!profile) {
+    console.log("🏋️ 운동 추천 시작 - 프로필 ID:", profileId)
+    
+    try {
+      // Find the selected profile
+      const profile = profiles.find(p => p.id === profileId)
+      
+      if (!profile) {
+        console.error("❌ 프로필을 찾을 수 없습니다:", profileId)
+        toast({
+          title: "❌ 프로필을 찾을 수 없습니다",
+          description: "선택한 프로필을 찾을 수 없습니다.",
+          variant: "destructive",
+        })
+        return
+      }
+      
+      console.log("✅ 프로필 찾음:", profile)
+      
+      const typedProfile = profile as any;
+      
+      // 운동 추천을 위한 데이터 준비
+      const dogInfoForRecommendation = { 
+        name: typedProfile.name,
+        age: typedProfile.age / 12, // 월 단위를 연 단위로 변환
+        breed: typedProfile.breed,
+        weight: typedProfile.weight,
+        gender: typedProfile.sex,
+        healthValues: typedProfile.health_values, 
+        performance: typedProfile.performance_values, 
+        preferences: { 
+          selected: typedProfile.preferences?.selected || [], 
+          intensity: typedProfile.preferences?.intensity || {} 
+        },
+        equipment: typedProfile.equipment_keys || []
+      }
+      
+      console.log("📤 운동 추천을 위한 데이터:", dogInfoForRecommendation)
+      
+      // localStorage에 저장
+      setLocalStorageItem("dogfit-dog-info", dogInfoForRecommendation)
+      
+      console.log("✅ localStorage에 데이터 저장 완료")
+      
       toast({
-        title: "❌ 프로필을 찾을 수 없습니다",
-        description: "선택한 프로필을 찾을 수 없습니다.",
+        title: "🏋️ 운동 추천 준비 완료",
+        description: `${typedProfile.name}의 맞춤 운동 추천 페이지로 이동합니다.`,
+      })
+      
+      // 잠시 지연 후 이동 (토스트 메시지 확인 시간 제공)
+      setTimeout(() => {
+        console.log("➡️ 결과 페이지로 이동")
+        router.push("/result")
+      }, 500)
+    } catch (e) {
+      console.error("❌ 운동 추천 준비 중 오류 발생:", e)
+      toast({
+        title: "❌ 오류 발생",
+        description: "운동 추천을 준비하는 중 오류가 발생했습니다.",
         variant: "destructive",
       })
-      return
     }
-    
-    const typedProfile = profile as any;
-
-    setLocalStorageItem("dogfit-dog-info", { 
-      name: typedProfile.name,
-      age: typedProfile.age / 12,
-      breed: typedProfile.breed,
-      weight: typedProfile.weight,
-      gender: typedProfile.sex,
-      healthValues: typedProfile.health_values, 
-      performance: typedProfile.performance_values, 
-      preferences: { 
-        selected: typedProfile.preferences?.selected || [], 
-        intensity: typedProfile.preferences?.intensity || {} 
-      },
-      equipment: typedProfile.equipment_keys || []
-    })
-    
-    // Navigate to result page
-    router.push("/result")
   }
 
   const handleDeleteProfile = async (profileId: number) => {
@@ -507,13 +540,17 @@ export default function ProfilePage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {profiles.map(profile => (
-              <Card key={profile.id} className="overflow-hidden border-orange-100 hover:shadow-md transition-shadow">
-                <div className="bg-gradient-to-r from-orange-100 to-amber-50 px-6 py-4">
+              <Card key={profile.id} className="overflow-hidden border border-orange-100 hover:shadow-md transition-shadow">
+                <CardHeader className="bg-gradient-to-r from-orange-50 to-amber-50 pb-2">
                   <div className="flex justify-between items-center">
-                    <h3 className="text-xl font-bold text-orange-800">{profile.name}</h3>
-                    <Badge className="bg-orange-500">{profile.breed}</Badge>
+                    <CardTitle className="text-xl font-bold text-orange-800">
+                      {profile.name}
+                    </CardTitle>
+                    <Badge variant="outline" className="bg-white text-orange-600 border-orange-200">
+                      {profile.breed}
+                    </Badge>
                   </div>
-                </div>
+                </CardHeader>
                 <CardContent className="pt-4">
                   <div className="grid grid-cols-3 gap-4 mb-4">
                     <div className="text-center">
@@ -529,29 +566,30 @@ export default function ProfilePage() {
                       <p className="font-medium">{profile.sex === 'male' ? '남아' : '여아'}</p>
                     </div>
                   </div>
-                  <div className="flex justify-between items-center mt-4">
-                    <div className="flex space-x-2">
-                      <Button 
-                        variant="outline" 
-                        className="border-orange-200 text-orange-600 hover:bg-orange-50"
-                        onClick={() => handleEditProfile(profile.id)}
-                      >
-                        수정
-                      </Button>
-                      <Button 
-                        variant="destructive" 
-                        className="bg-red-500 hover:bg-red-600"
-                        onClick={() => { setSelectedProfile(profile); setIsDialogOpen(true); }}
-                      >
-                        삭제
-                      </Button>
-                    </div>
+                  
+                  {/* 운동 추천받기 버튼 - 더 눈에 띄게 강조 */}
+                  <Button 
+                    className="w-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center py-5 mb-4 rounded-lg shadow-sm"
+                    onClick={() => handleExerciseRecommendation(profile.id)}
+                  >
+                    <Dumbbell size={20} className="mr-2" />
+                    <span className="font-medium">운동 추천받기</span>
+                  </Button>
+                  
+                  <div className="flex justify-between items-center mt-2">
                     <Button 
-                      className="bg-blue-500 hover:bg-blue-600 text-white flex items-center"
-                      onClick={() => handleExerciseRecommendation(profile.id)}
+                      variant="outline" 
+                      className="border-orange-200 text-orange-600 hover:bg-orange-50"
+                      onClick={() => handleEditProfile(profile.id)}
                     >
-                      <Dumbbell size={16} className="mr-2" />
-                      운동 추천받기
+                      수정
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      className="bg-red-500 hover:bg-red-600"
+                      onClick={() => { setSelectedProfile(profile); setIsDialogOpen(true); }}
+                    >
+                      삭제
                     </Button>
                   </div>
                 </CardContent>

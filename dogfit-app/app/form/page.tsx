@@ -508,8 +508,8 @@ export default function DogInfoForm() {
         variant: "default",
       })
       
-      // 결과 페이지로 이동
-      router.push("/result")
+      // 저장 후 /profile 페이지로 리디렉션
+      router.push("/profile")
       return true
     } catch (e) {
       console.error("❌ Supabase 저장 중 오류 발생:", e)
