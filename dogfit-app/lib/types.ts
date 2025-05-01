@@ -49,10 +49,16 @@ export interface DogProfile {
 }
 
 export interface DogProfileData {
+  
+  id: number
   dogInfo: DogInfo
   healthValues: Record<string, number>
   performanceValues: Record<string, number>
   selectedActivities: Record<string, boolean>
   intensities: Record<string, number>
   selectedEquipment: Record<string, boolean>
+  preferences: {
+    selected: string[]
+    intensity: Record<string, number>
+  }
 }

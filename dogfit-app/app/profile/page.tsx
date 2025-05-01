@@ -34,8 +34,14 @@ export default function ProfilePage() {
   
 
   useEffect(() => {
+    // 이미 처리 중인지 추적하는 플래그
+    let isProcessing = false;
+    
     // Check if user is authenticated and handle pending data
     const init = async () => {
+      if (isProcessing) return; // 이미 처리 중이면 중복 실행 방지
+      isProcessing = true;
+      
       try {
         const { data: { session } } = await supabase.auth.getSession()
         
@@ -48,26 +54,49 @@ export default function ProfilePage() {
         
         // Handle pending data if exists
         if (hasPendingData) {
+          console.log("🔄 URL에서 pending_data=true 감지, 임시 데이터 처리 시작")
           await handlePendingData(session.user.id)
+          
+          // 쿼리 파라미터 제거 (중요: 페이지 새로고침 시 중복 처리 방지)
+          const newUrl = new URL(window.location.href);
+          newUrl.searchParams.delete('pending_data');
+          window.history.replaceState({}, '', newUrl.toString());
+          console.log("🧹 URL에서 pending_data 파라미터 제거")
         }
         
         // Fetch profiles
-        fetchProfiles()
+        await fetchProfiles()
         
         setLoading(false)
       } catch (e) {
         console.error("초기화 중 오류 발생:", e)
         setLoading(false)
+      } finally {
+        isProcessing = false;
       }
     }
     
     init()
-  }, [router, hasPendingData])
+  }, [router, hasPendingData]) // router와 hasPendingData 의존성 추가
 
   // Function to handle pending data
   const handlePendingData = async (userId: string) => {
+    console.log("🔍 임시 저장된 데이터 확인 중...")
+    
+    // 이미 처리 완료 여부 확인
+    const processedFlag = getLocalStorageItem('dogfit-pending-processed', false)
+    if (processedFlag) {
+      console.log("⚠️ 이미 처리된 임시 데이터입니다. 중복 처리 방지")
+      localStorage.removeItem('dogfit-pending-profile') // 안전하게 제거
+      setIsSaving(false)
+      return
+    }
+    
     try {
       setIsSaving(true)
+      
+      // 처리 중임을 표시
+      setLocalStorageItem('dogfit-pending-processed', true)
       
       // Get pending data from localStorage
       const pendingData = getLocalStorageItem('dogfit-pending-profile', null) as {
@@ -80,8 +109,12 @@ export default function ProfilePage() {
       } | null;
       
       if (!pendingData) {
+        console.log("⚠️ 임시 저장된 데이터가 없습니다")
+        setIsSaving(false)
         return
       }
+      
+      console.log("✅ 임시 데이터 발견:", pendingData)
       
       // Extract data from pending data
       const {
@@ -94,6 +127,8 @@ export default function ProfilePage() {
       } = pendingData
       
       if (!dogInfo) {
+        console.log("⚠️ 필수 데이터(dogInfo)가 없습니다")
+        setIsSaving(false)
         return
       }
       
@@ -104,10 +139,25 @@ export default function ProfilePage() {
       const selectedEquipmentList = selectedEquipment ? 
         Object.keys(selectedEquipment).filter(key => selectedEquipment[key]) : []
       
-      const profileData = {
+      const profileData: {
+        id?: number;
+        name: string;
+        sex: string;
+        age: number;
+        weight: number;
+        breed: string;
+        health_values: any;
+        performance_values: any;
+        preferences: {
+          selected: string[];
+          intensity: Record<string, any> | undefined;
+        };
+        equipment_keys: string[];
+        user_id: string;
+      } = {
         name: dogInfo?.name || '',
         sex: dogInfo?.gender || '',
-        age: dogInfo?.age ? Math.round(dogInfo.age * 12) : 0, // Convert to months
+        age: dogInfo?.age ? Math.round(dogInfo.age * 12) : 0,
         weight: dogInfo?.weight || 0,
         breed: dogInfo?.breed || '',
         health_values: healthValues,
@@ -116,26 +166,58 @@ export default function ProfilePage() {
           selected: selectedActivitiesList,
           intensity: intensities
         },
-        equipment_keys: selectedEquipmentList
+        equipment_keys: selectedEquipmentList,
+        user_id: userId
+      }
+      
+      console.log("📤 Supabase에 저장할 데이터:", profileData)
+      
+      // Check for existing profiles to avoid duplicates
+      const { data: existingProfiles, error: fetchError } = await supabase
+        .from('dog_profile')
+        .select('id, name')
+        .eq('user_id', userId)
+        .eq('name', profileData.name)
+      
+      if (fetchError) {
+        console.error("❌ 기존 프로필 확인 실패:", fetchError)
+        toast({
+          title: "❌ 프로필 확인 실패",
+          description: "기존 프로필을 확인하는 중 오류가 발생했습니다.",
+          variant: "destructive",
+        })
+        setIsSaving(false)
+        return
+      }
+      
+      // If profile with same name exists, update it instead of creating new one
+      if (existingProfiles && existingProfiles.length > 0) {
+        console.log("🔄 동일한 이름의 프로필이 존재합니다. 업데이트를 진행합니다:", existingProfiles[0])
+        profileData.id = existingProfiles[0].id
       }
       
       // Save to Supabase
       const { data, error } = await upsertDogProfile(profileData as any)
       
       if (error) {
-        console.error("임시 데이터 저장 실패:", error)
+        console.error("❌ 임시 데이터 저장 실패:", error)
         toast({
           title: "❌ 프로필 저장 실패",
           description: "임시 저장된 데이터를 저장하는 중 오류가 발생했습니다.",
           variant: "destructive",
         })
+        setIsSaving(false)
         return
       }
       
-      // Clear pending data
-      localStorage.removeItem('dogfit-pending-profile')
+      console.log("✅ Supabase 저장 성공:", data)
       
-      // Save to localStorage for result page
+      // Only remove from localStorage after successful save
+      localStorage.removeItem('dogfit-pending-profile')
+      localStorage.removeItem('dogfit-pending-processed') // 처리 완료 후 플래그도 제거
+      console.log("✅ localStorage에서 임시 데이터 및 처리 플래그 삭제 완료")
+      
+      // Save to localStorage for result page (but don't render it)
       setLocalStorageItem("dogfit-dog-info", { 
         ...dogInfo, 
         healthValues, 
@@ -153,10 +235,14 @@ export default function ProfilePage() {
         variant: "default",
       })
       
-      // Refresh profiles
-      fetchProfiles()
+      // Refresh profiles to show the newly saved profile
+      // But use a flag to prevent duplicate rendering
+      await fetchProfiles(true) // true indicates this is after a save
+      
     } catch (e) {
-      console.error("임시 데이터 처리 중 오류 발생:", e)
+      // 오류 발생 시 처리 플래그 제거하여 재시도 가능하게 함
+      localStorage.removeItem('dogfit-pending-processed')
+      console.error("❌ 임시 데이터 처리 중 오류 발생:", e)
       toast({
         title: "❌ 오류 발생",
         description: "임시 데이터를 처리하는 중 오류가 발생했습니다.",
@@ -167,25 +253,50 @@ export default function ProfilePage() {
     }
   }
 
-  const fetchProfiles = async () => {
+  // Modified fetchProfiles function to handle post-save scenarios
+  const fetchProfiles = async (isAfterSave = false) => {
     setIsLoading(true)
     try {
+      console.log("🔍 Supabase에서 프로필 목록 불러오는 중...")
+      
+      // 현재 세션에서 사용자 ID 가져오기
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session || !session.user) {
+        console.error("❌ 사용자 정보가 없습니다")
+        setIsLoading(false)
+        return
+      }
+      
+      const userId = session.user.id
+      
+      // 현재 로그인한 사용자의 프로필만 가져오기
       const { data, error } = await supabase
         .from('dog_profile')
         .select('*')
+        .eq('user_id', userId) // 세션에서 직접 가져온 ID 사용
       
       if (error) {
-        console.error("프로필 불러오기 실패:", error)
+        console.error("❌ 프로필 불러오기 실패:", error)
         toast({
           title: "프로필 불러오기 실패",
           description: "프로필을 불러오는 중 오류가 발생했습니다.",
           variant: "destructive",
         })
       } else {
+        console.log("✅ 프로필 불러오기 성공:", data)
+        
+        // Set profiles from Supabase data
         setProfiles(data || [])
+        
+        // If this is after a save, we don't need to show any localStorage data
+        if (isAfterSave) {
+          // We've already saved the data to Supabase, so we can ignore localStorage
+          console.log("🔄 저장 후 프로필 목록 갱신 완료")
+        }
       }
     } catch (e) {
-      console.error("프로필 불러오기 중 오류 발생:", e)
+      console.error("❌ 프로필 불러오기 중 오류 발생:", e)
       toast({
         title: "오류 발생",
         description: "프로필을 불러오는 중 오류가 발생했습니다.",
