@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -27,6 +27,7 @@ import { insertDogProfile } from "@/lib/supabase/insertDogProfile"
 import { getDogProfile } from "@/lib/supabase/getDogProfile"
 import { upsertDogProfile } from "@/lib/supabase/upsertDogProfile"
 import { supabase } from "@/lib/supabase/supabaseClient"
+
 
 
 export default function DogInfoForm() {
@@ -94,6 +95,68 @@ export default function DogInfoForm() {
 
   // 운동기구 목록을 Supabase에서 불러오는 함수
   const [equipmentList, setEquipmentList] = useState(equipmentItems)
+
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+  const searchParams = useSearchParams()
+  const hasPendingData = searchParams.get('pending_data') === 'true'
+  
+  // Check authentication status on component mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setIsAuthenticated(!!session)
+    }
+    
+    checkAuth()
+  }, [])
+  
+  // Load pending data after login if needed
+  useEffect(() => {
+    if (isAuthenticated && hasPendingData) {
+      const pendingData = getLocalStorageItem('dogfit-pending-profile', null)
+      if (pendingData) {
+        // Restore form state from pending data
+        if (pendingData && typeof pendingData === 'object') {
+          // Type assertion to avoid 'never' type errors
+          const typedPendingData = pendingData as {
+            step?: number;
+            dogInfo?: typeof dogInfo;
+            healthValues?: typeof healthValues;
+            performanceValues?: typeof performanceValues;
+            selectedActivities?: typeof selectedActivities;
+            intensities?: typeof intensities;
+            selectedEquipment?: typeof selectedEquipment;
+          };
+          
+          if (typedPendingData.dogInfo) setDogInfo(typedPendingData.dogInfo);
+          if (typedPendingData.healthValues) setHealthValues(typedPendingData.healthValues);
+          if (typedPendingData.performanceValues) setPerformanceValues(typedPendingData.performanceValues);
+          if (typedPendingData.selectedActivities) setSelectedActivities(typedPendingData.selectedActivities);
+          if (typedPendingData.intensities) setIntensities(typedPendingData.intensities);
+          if (typedPendingData.selectedEquipment) setSelectedEquipment(typedPendingData.selectedEquipment);
+          
+          // Clear pending data
+          localStorage.removeItem('dogfit-pending-profile')
+          
+          // If we were at step 5, proceed to save
+          if (typedPendingData.step === 5) {
+            setStep(5)
+            // Delay to ensure state is updated
+            setTimeout(() => {
+              saveFullProfile()
+            }, 500)
+          } else {
+            setStep(typedPendingData.step || 1)
+          }
+        }
+        
+        toast({
+          title: "✅ 임시 저장된 데이터를 불러왔습니다",
+          description: "로그인 후 이전에 입력하던 데이터가 복원되었습니다.",
+        })
+      }
+    }
+  }, [isAuthenticated, hasPendingData])
 
   useEffect(() => {
     // Load profiles from localStorage
@@ -312,6 +375,78 @@ export default function DogInfoForm() {
 
   // 전체 프로필 저장 함수
   const saveFullProfile = async () => {
+    // Check if user is authenticated
+    if (isAuthenticated === false) {
+      console.log("🔒 로그인되지 않은 상태 감지, 임시 저장 시작")
+      
+      try {
+        // 저장할 데이터 준비
+        const pendingData = {
+          step: 5,
+          dogInfo,
+          healthValues,
+          performanceValues,
+          selectedActivities,
+          intensities,
+          selectedEquipment
+        }
+        
+        console.log("🐶 저장할 formData:", pendingData)
+        
+        // localStorage는 클라이언트 환경에서만 사용 가능
+        if (typeof window === "undefined") {
+          console.error("❌ 브라우저 환경이 아닙니다")
+          toast({
+            title: "저장 실패",
+            description: "브라우저 환경에서만 임시 저장이 가능합니다.",
+            variant: "destructive",
+          })
+          return
+        }
+        
+        // 직렬화 가능한지 확인
+        try {
+          JSON.stringify(pendingData)
+        } catch (e) {
+          console.error("❌ 데이터 직렬화 실패:", e)
+          toast({
+            title: "저장 실패",
+            description: "데이터 형식에 문제가 있어 임시 저장할 수 없습니다.",
+            variant: "destructive",
+          })
+          return
+        }
+        
+        // localStorage에 저장
+        setLocalStorageItem('dogfit-pending-profile', pendingData)
+        
+        console.log("✅ localStorage 저장 완료")
+        
+        toast({
+          title: "⚠️ 로그인이 필요합니다",
+          description: "입력하신 데이터는 임시 저장되었습니다. 로그인 후 계속 진행해주세요.",
+        })
+        
+        // 이벤트 루프 분리를 통해 브라우저가 저장 작업을 완료할 시간 확보
+        await new Promise(resolve => setTimeout(resolve, 50))
+        
+        console.log("➡️ 로그인 페이지로 이동")
+        
+        // Redirect to login page with a flag to indicate pending data
+        router.push('/login?pending_data=true&redirect=/profile')
+        return
+      } catch (e) {
+        console.error("❌ 임시 저장 중 오류 발생:", e)
+        toast({
+          title: "저장 실패",
+          description: "데이터를 임시 저장하는 중 오류가 발생했습니다.",
+          variant: "destructive",
+        })
+        return
+      }
+    }
+    
+    console.log("🔓 로그인된 상태, Supabase에 직접 저장 시작")
     setIsLoading(true)
     
     try {
@@ -377,7 +512,7 @@ export default function DogInfoForm() {
       router.push("/result")
       return true
     } catch (e) {
-      console.error("프로필 저장 중 오류 발생:", e)
+      console.error("❌ Supabase 저장 중 오류 발생:", e)
       toast({
         title: "❌ 오류 발생",
         description: "프로필 저장 중 오류가 발생했습니다.",

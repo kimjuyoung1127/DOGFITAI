@@ -1,52 +1,171 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { User } from "@supabase/supabase-js"
 import Link from "next/link"
 import Image from "next/image"
-import { LogOut, PawPrint, Plus } from "lucide-react"
+import { LogOut, PawPrint, Plus, Dumbbell } from "lucide-react"
 
-import type { DogProfile } from "@/lib/types"
+import type { DogProfile, DogProfileData } from "@/lib/types"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { supabase } from "@/lib/supabase/supabaseClient"
 import { useToast } from "@/components/ui/use-toast"
+import { getLocalStorageItem, setLocalStorageItem } from "@/lib/utils"
+import { upsertDogProfile } from "@/lib/supabase/upsertDogProfile"
+
 
 export default function ProfilePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const hasPendingData = searchParams.get('pending_data') === 'true'
+  
   const [profiles, setProfiles] = useState<DogProfile[]>([])
   const [selectedProfile, setSelectedProfile] = useState<DogProfile | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
   const { toast } = useToast()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  
 
   useEffect(() => {
-    // Check if user is authenticated
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        router.push('/login')
-        return false
-      }
-      setUser(session.user)
-      return true
-    }
-    
+    // Check if user is authenticated and handle pending data
     const init = async () => {
-      const isAuth = await checkAuth()
-      if (isAuth) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (!session) {
+          router.push('/login')
+          return
+        }
+        
+        setUser(session.user)
+        
+        // Handle pending data if exists
+        if (hasPendingData) {
+          await handlePendingData(session.user.id)
+        }
+        
+        // Fetch profiles
         fetchProfiles()
+        
+        setLoading(false)
+      } catch (e) {
+        console.error("초기화 중 오류 발생:", e)
+        setLoading(false)
       }
-      setLoading(false)
     }
     
     init()
-  }, [router])
+  }, [router, hasPendingData])
+
+  // Function to handle pending data
+  const handlePendingData = async (userId: string) => {
+    try {
+      setIsSaving(true)
+      
+      // Get pending data from localStorage
+      const pendingData = getLocalStorageItem('dogfit-pending-profile', null) as {
+        dogInfo?: any;
+        healthValues?: any;
+        performanceValues?: any;
+        selectedActivities?: Record<string, boolean>;
+        intensities?: Record<string, any>;
+        selectedEquipment?: Record<string, boolean>;
+      } | null;
+      
+      if (!pendingData) {
+        return
+      }
+      
+      // Extract data from pending data
+      const {
+        dogInfo,
+        healthValues,
+        performanceValues,
+        selectedActivities,
+        intensities,
+        selectedEquipment
+      } = pendingData
+      
+      if (!dogInfo) {
+        return
+      }
+      
+      // Prepare profile data for Supabase
+      const selectedActivitiesList = selectedActivities ? 
+        Object.keys(selectedActivities).filter(key => selectedActivities[key]) : []
+      
+      const selectedEquipmentList = selectedEquipment ? 
+        Object.keys(selectedEquipment).filter(key => selectedEquipment[key]) : []
+      
+      const profileData = {
+        name: dogInfo?.name || '',
+        sex: dogInfo?.gender || '',
+        age: dogInfo?.age ? Math.round(dogInfo.age * 12) : 0, // Convert to months
+        weight: dogInfo?.weight || 0,
+        breed: dogInfo?.breed || '',
+        health_values: healthValues,
+        performance_values: performanceValues,
+        preferences: {
+          selected: selectedActivitiesList,
+          intensity: intensities
+        },
+        equipment_keys: selectedEquipmentList
+      }
+      
+      // Save to Supabase
+      const { data, error } = await upsertDogProfile(profileData as any)
+      
+      if (error) {
+        console.error("임시 데이터 저장 실패:", error)
+        toast({
+          title: "❌ 프로필 저장 실패",
+          description: "임시 저장된 데이터를 저장하는 중 오류가 발생했습니다.",
+          variant: "destructive",
+        })
+        return
+      }
+      
+      // Clear pending data
+      localStorage.removeItem('dogfit-pending-profile')
+      
+      // Save to localStorage for result page
+      setLocalStorageItem("dogfit-dog-info", { 
+        ...dogInfo, 
+        healthValues, 
+        performance: performanceValues, 
+        preferences: { 
+          selected: selectedActivitiesList, 
+          intensity: intensities 
+        },
+        equipment: selectedEquipmentList
+      })
+      
+      toast({
+        title: "✅ 프로필 저장 완료",
+        description: "임시 저장된 데이터가 성공적으로 저장되었습니다.",
+        variant: "default",
+      })
+      
+      // Refresh profiles
+      fetchProfiles()
+    } catch (e) {
+      console.error("임시 데이터 처리 중 오류 발생:", e)
+      toast({
+        title: "❌ 오류 발생",
+        description: "임시 데이터를 처리하는 중 오류가 발생했습니다.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   const fetchProfiles = async () => {
     setIsLoading(true)
@@ -75,6 +194,41 @@ export default function ProfilePage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Function to handle exercise recommendation
+  const handleExerciseRecommendation = (profileId: number) => {
+    // Find the selected profile
+    const profile = profiles.find(p => p.id === profileId)
+    
+    if (!profile) {
+      toast({
+        title: "❌ 프로필을 찾을 수 없습니다",
+        description: "선택한 프로필을 찾을 수 없습니다.",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    const typedProfile = profile as any;
+
+    setLocalStorageItem("dogfit-dog-info", { 
+      name: typedProfile.name,
+      age: typedProfile.age / 12,
+      breed: typedProfile.breed,
+      weight: typedProfile.weight,
+      gender: typedProfile.sex,
+      healthValues: typedProfile.health_values, 
+      performance: typedProfile.performance_values, 
+      preferences: { 
+        selected: typedProfile.preferences?.selected || [], 
+        intensity: typedProfile.preferences?.intensity || {} 
+      },
+      equipment: typedProfile.equipment_keys || []
+    })
+    
+    // Navigate to result page
+    router.push("/result")
   }
 
   const handleDeleteProfile = async (profileId: number) => {
@@ -140,6 +294,9 @@ export default function ProfilePage() {
             <PawPrint size={48} className="text-orange-500" />
           </div>
           <p className="text-lg font-medium text-gray-600">잠시만 기다려주세요...</p>
+          {isSaving && (
+            <p className="text-sm text-orange-500 mt-2">임시 저장된 데이터를 처리 중입니다...</p>
+          )}
         </div>
       </div>
     )
@@ -185,7 +342,7 @@ export default function ProfilePage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-white">
-              안녕하세요, {user.email?.split('@')[0] || '반려인'}님!
+              안녕하세요, {user?.email?.split('@')[0] || '반려인'}님!
             </h1>
             <p className="text-orange-50 mt-1">
               오늘도 반려견과 함께 건강한 하루 보내세요 🐾
@@ -261,20 +418,29 @@ export default function ProfilePage() {
                       <p className="font-medium">{profile.sex === 'male' ? '남아' : '여아'}</p>
                     </div>
                   </div>
-                  <div className="flex justify-end space-x-2 mt-2">
+                  <div className="flex justify-between items-center mt-4">
+                    <div className="flex space-x-2">
+                      <Button 
+                        variant="outline" 
+                        className="border-orange-200 text-orange-600 hover:bg-orange-50"
+                        onClick={() => handleEditProfile(profile.id)}
+                      >
+                        수정
+                      </Button>
+                      <Button 
+                        variant="destructive" 
+                        className="bg-red-500 hover:bg-red-600"
+                        onClick={() => { setSelectedProfile(profile); setIsDialogOpen(true); }}
+                      >
+                        삭제
+                      </Button>
+                    </div>
                     <Button 
-                      variant="outline" 
-                      className="border-orange-200 text-orange-600 hover:bg-orange-50"
-                      onClick={() => handleEditProfile(profile.id)}
+                      className="bg-blue-500 hover:bg-blue-600 text-white flex items-center"
+                      onClick={() => handleExerciseRecommendation(profile.id)}
                     >
-                      수정
-                    </Button>
-                    <Button 
-                      variant="destructive" 
-                      className="bg-red-500 hover:bg-red-600"
-                      onClick={() => { setSelectedProfile(profile); setIsDialogOpen(true); }}
-                    >
-                      삭제
+                      <Dumbbell size={16} className="mr-2" />
+                      운동 추천받기
                     </Button>
                   </div>
                 </CardContent>
@@ -283,23 +449,6 @@ export default function ProfilePage() {
           </div>
         )}
       </div>
-
-      {/* 추천 운동 바로가기 */}
-      <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-bold text-blue-800 mb-2">오늘의 추천 운동</h3>
-              <p className="text-blue-600">반려견에게 맞춤형 운동을 추천해드려요!</p>
-            </div>
-            <Link href="/exercise">
-              <Button className="bg-blue-500 hover:bg-blue-600 text-white px-5 py-2 rounded-lg">
-                운동 추천받기
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* 삭제 확인 다이얼로그 */}
       {selectedProfile && (

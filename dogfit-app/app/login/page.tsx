@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,6 +11,9 @@ import { Provider } from "@supabase/supabase-js"
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const pendingData = searchParams.get('pending_data') === 'true'
+  const redirectPath = searchParams.get('redirect') || '/profile'
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -25,14 +28,14 @@ export default function LoginPage() {
 
       if (error) {
         alert("로그인 실패: " + error.message)
-      } else {
-        console.log("로그인 성공:", data.user)
-        router.push("/profile")
+        setIsLoading(false)
+        return
       }
+
+      router.push(`${redirectPath}${pendingData ? '?pending_data=true' : ''}`)
     } catch (e) {
       console.error("로그인 중 오류 발생:", e)
       alert("로그인 중 오류가 발생했습니다.")
-    } finally {
       setIsLoading(false)
     }
   }
@@ -42,10 +45,10 @@ export default function LoginPage() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: `${window.location.origin}/auth/callback?redirect=${redirectPath}${pendingData ? '&pending_data=true' : ''}`,
         }
       })
-
+      
       if (error) {
         alert("Google 로그인 실패: " + error.message)
       }
@@ -60,7 +63,7 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "kakao",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: `${window.location.origin}/auth/callback?redirect=${redirectPath}${pendingData ? '&pending_data=true' : ''}`,
         }
       })
 
@@ -78,7 +81,7 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "naver" as Provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: `${window.location.origin}/auth/callback?redirect=${redirectPath}${pendingData ? '&pending_data=true' : ''}`,
         }
       })
 
@@ -93,6 +96,13 @@ export default function LoginPage() {
 
   return (
     <div className="container flex flex-col items-center justify-center min-h-screen p-4">
+      {pendingData && (
+        <div className="bg-orange-50 border-l-4 border-orange-500 p-4 mb-4">
+          <p className="text-orange-700">
+            <strong>입력 중인 데이터가 있습니다.</strong> 로그인하시면 이전에 입력하던 내용을 이어서 진행할 수 있습니다.
+          </p>
+        </div>
+      )}
       <Card className="w-full max-w-md mx-auto overflow-hidden shadow-lg">
         <CardHeader>
           <CardTitle className="text-center">로그인</CardTitle>

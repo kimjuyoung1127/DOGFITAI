@@ -1,6 +1,7 @@
 import { Circle, CircleDot, Disc, RectangleVerticalIcon as Rectangle, Square, Triangle } from "lucide-react"
 
 
+
 const equipmentItems = [
     {
       key: "cone_bar",

@@ -44,4 +44,15 @@ export interface DogProfile {
   intensity: Record<string, number>
   selectedActivities: Record<string, boolean>
   selectedEquipment: Record<string, boolean>  
+
+  
+}
+
+export interface DogProfileData {
+  dogInfo: DogInfo
+  healthValues: Record<string, number>
+  performanceValues: Record<string, number>
+  selectedActivities: Record<string, boolean>
+  intensities: Record<string, number>
+  selectedEquipment: Record<string, boolean>
 }

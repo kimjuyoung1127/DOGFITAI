@@ -6,6 +6,10 @@ import type { NextRequest } from 'next/server'
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
+  
+  // Get redirect path and pending data flag from query params
+  const redirectPath = requestUrl.searchParams.get('redirect') || '/profile'
+  const pendingData = requestUrl.searchParams.get('pending_data') === 'true'
 
   if (code) {
     const cookieStore = cookies()
@@ -13,6 +17,11 @@ export async function GET(request: NextRequest) {
     await supabase.auth.exchangeCodeForSession(code)
   }
 
-  // URL to redirect to after sign in process completes
-  return NextResponse.redirect(new URL('/profile', request.url))
+  // Construct the redirect URL with pending data flag if needed
+  const redirectUrl = new URL(redirectPath, request.url)
+  if (pendingData) {
+    redirectUrl.searchParams.set('pending_data', 'true')
+  }
+
+  return NextResponse.redirect(redirectUrl)
 } 
