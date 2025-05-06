@@ -62,43 +62,38 @@ export async function POST(request: Request) {
       performanceValues: profile.performance_values || {}
     };
     
-    // OpenAI API 호출을 위한 프롬프트 구성
+    // OpenAI API 호출을 위한 프롬프트 수정
     const prompt = `
-당신은 반려견 맞춤형 운동 추천 전문가입니다. 다음 반려견 프로필 정보를 바탕으로 5개의 맞춤형 운동을 추천해주세요:
+다음 강아지 프로필에 맞는 운동 추천을 JSON 형식으로 제공해주세요:
 
-반려견 정보:
+강아지 정보:
 - 이름: ${dogProfile.name}
 - 나이: ${dogProfile.age.years}년 ${dogProfile.age.months}개월
 - 체중: ${dogProfile.weight}kg
-- 성별: ${dogProfile.gender === 'male' ? '수컷' : '암컷'}
+- 성별: ${dogProfile.gender}
 - 견종: ${dogProfile.breed}
 - 선호 활동: ${dogProfile.preferredActivities.join(', ') || '없음'}
 - 사용 가능한 장비: ${dogProfile.availableEquipment.join(', ') || '없음'}
 
-${dogProfile.healthValues && Object.keys(dogProfile.healthValues).length > 0 ? 
-`- 건강 상태: ${Object.entries(dogProfile.healthValues).map(([key, value]) => `${key}: ${value}`).join(', ')}` : ''}
+반드시 다음 형식의 JSON으로 응답해주세요:
+{
+  "recommendations": [
+    {
+      "id": "1",
+      "name": "운동 이름",
+      "description": "운동에 대한 간략한 설명",
+      "difficulty": "easy/medium/hard 중 하나",
+      "duration": 숫자(분 단위),
+      "equipment": ["필요한 장비1", "필요한 장비2"],
+      "steps": ["1단계 설명", "2단계 설명", "3단계 설명"],
+      "benefits": ["효과1", "효과2", "효과3"]
+    },
+    // 총 5개의 운동 추천
+  ]
+}
 
-${dogProfile.performanceValues && Object.keys(dogProfile.performanceValues).length > 0 ? 
-`- 운동 능력: ${Object.entries(dogProfile.performanceValues).map(([key, value]) => `${key}: ${value}`).join(', ')}` : ''}
-
-각 운동 추천은 다음 형식의 JSON 배열로 제공해주세요:
-[
-  {
-    "id": "고유 ID (영문 소문자와 하이픈으로 구성)",
-    "name": "운동 이름",
-    "description": "운동에 대한 간략한 설명",
-    "difficulty": "난이도 (easy, medium, hard 중 하나)",
-    "duration": 소요 시간(분 단위, 숫자만),
-    "equipment": ["필요한 장비1", "필요한 장비2"],
-    "benefits": ["기대 효과1", "기대 효과2"],
-    "steps": ["운동 단계1", "운동 단계2", "운동 단계3"]
-  },
-  ...
-]
-
-반려견의 나이, 체중, 건강 상태를 고려하여 적절한 난이도와 운동 시간을 추천해주세요.
 사용 가능한 장비가 있다면 이를 활용한 운동을, 없다면 맨몸으로 할 수 있는 운동을 추천해주세요.
-반드시 JSON 형식으로만 응답해주세요. 추가 설명이나 다른 텍스트는 포함하지 마세요.
+반드시 위 형식의 JSON 객체로만 응답해주세요. 추가 설명이나 다른 텍스트는 포함하지 마세요.
 `;
 
     console.log('🤖 OpenAI API 호출 중...');
@@ -109,7 +104,7 @@ ${dogProfile.performanceValues && Object.keys(dogProfile.performanceValues).leng
       messages: [
         { 
           role: "system", 
-          content: "당신은 반려견 운동 전문가입니다. 요청에 따라 JSON 형식으로만 응답하세요." 
+          content: "당신은 반려견 운동 전문가입니다. 요청에 따라 JSON 배열 형식으로만 응답하세요. 배열 외의 텍스트나 설명은 포함하지 마세요." 
         },
         { 
           role: "user", 
@@ -131,11 +126,23 @@ ${dogProfile.performanceValues && Object.keys(dogProfile.performanceValues).leng
     try {
       // JSON 파싱
       const parsedResponse = JSON.parse(responseContent);
-      const recommendations = parsedResponse.recommendations || parsedResponse;
       
-      // 응답 형식 검증
-      if (!Array.isArray(recommendations)) {
-        throw new Error('응답이 배열 형식이 아닙니다.');
+      // 단일 객체인 경우 배열로 변환
+      let recommendations;
+      
+      if (Array.isArray(parsedResponse)) {
+        recommendations = parsedResponse;
+      } else if (parsedResponse.recommendations && Array.isArray(parsedResponse.recommendations)) {
+        recommendations = parsedResponse.recommendations;
+      } else if (parsedResponse.exercises && Array.isArray(parsedResponse.exercises)) {
+        recommendations = parsedResponse.exercises;
+      } else if (parsedResponse.id) {
+        // 단일 객체인 경우 배열로 변환
+        recommendations = [parsedResponse];
+        console.log('⚠️ 단일 객체를 배열로 변환했습니다');
+      } else {
+        console.error('❌ 예상치 못한 응답 구조:', parsedResponse);
+        throw new Error('응답이 예상된 형식이 아닙니다.');
       }
       
       console.log(`✅ ${recommendations.length}개의 운동 추천 생성 완료`);
@@ -149,6 +156,7 @@ ${dogProfile.performanceValues && Object.keys(dogProfile.performanceValues).leng
       
     } catch (parseError) {
       console.error('❌ OpenAI 응답 파싱 실패:', parseError);
+      console.log('원본 응답:', responseContent);
       return NextResponse.json(
         { error: 'Failed to parse AI response', details: responseContent },
         { status: 500 }

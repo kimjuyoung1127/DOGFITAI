@@ -312,72 +312,63 @@ export default function ProfilePage() {
   }
 
   // Function to handle exercise recommendation
-  const handleExerciseRecommendation = (profileId: number) => {
-    // 중복 클릭 방지
-    if (isLoading) return;
-    
-    console.log("🏋️ 운동 추천 시작 - 프로필 ID:", profileId)
-    
+  const handleExerciseRecommendation = async (profileId: number) => {
     try {
-      // Find the selected profile
-      const profile = profiles.find(p => p.id === profileId)
+      // 로딩 상태 설정
+      setIsLoading(true);
       
-      if (!profile) {
-        console.error("❌ 프로필을 찾을 수 없습니다:", profileId)
-        toast({
-          title: "❌ 프로필을 찾을 수 없습니다",
-          description: "선택한 프로필을 찾을 수 없습니다.",
-          variant: "destructive",
-        })
-        return
-      }
+      console.log(`🏋️ 프로필 ID ${profileId}에 대한 운동 추천 요청 시작...`);
       
-      console.log("✅ 프로필 찾음:", profile)
-      
-      const typedProfile = profile as any;
-      
-      // 운동 추천을 위한 데이터 준비
-      const dogInfoForRecommendation = { 
-        name: typedProfile.name,
-        age: typedProfile.age / 12, // 월 단위를 연 단위로 변환
-        breed: typedProfile.breed,
-        weight: typedProfile.weight,
-        gender: typedProfile.sex,
-        healthValues: typedProfile.health_values, 
-        performance: typedProfile.performance_values, 
-        preferences: { 
-          selected: typedProfile.preferences?.selected || [], 
-          intensity: typedProfile.preferences?.intensity || {} 
+      // API 호출
+      const response = await fetch('/api/exercises', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        equipment: typedProfile.equipment_keys || []
+        body: JSON.stringify({ profileId }),
+      });
+      
+      // 응답 처리
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || '알 수 없는 오류가 발생했습니다.');
       }
       
-      console.log("📤 운동 추천을 위한 데이터:", dogInfoForRecommendation)
+      // 추천 운동 추출
+      const recommendations = data.recommendations || [];
+      
+      console.log(`✅ 추천 운동 ${recommendations.length}개 수신 완료:`, recommendations);
       
       // localStorage에 저장
-      setLocalStorageItem("dogfit-dog-info", dogInfoForRecommendation)
+      setLocalStorageItem("dogfit-recommendations", recommendations);
+      console.log("✅ 추천 운동 저장됨", recommendations);
       
-      console.log("✅ localStorage에 데이터 저장 완료")
+      // 프로필 ID도 저장 (result 페이지에서 필요할 수 있음)
+      setLocalStorageItem("dogfit-selected-profile-id", profileId);
       
+      // 성공 토스트 메시지
       toast({
-        title: "🏋️ 운동 추천 준비 완료",
-        description: `${typedProfile.name}의 맞춤 운동 추천 페이지로 이동합니다.`,
-      })
+        title: "✅ 운동 추천 완료",
+        description: `${recommendations.length}개의 맞춤형 운동이 추천되었습니다.`,
+      });
       
-      // 잠시 지연 후 이동 (토스트 메시지 확인 시간 제공)
+      // 잠시 후 결과 페이지로 이동
       setTimeout(() => {
-        console.log("➡️ 결과 페이지로 이동")
-        router.push("/result")
-      }, 500)
-    } catch (e) {
-      console.error("❌ 운동 추천 준비 중 오류 발생:", e)
+        router.push("/result");
+      }, 1000);
+      
+    } catch (error) {
+      console.error('❌ 운동 추천 요청 실패:', error);
       toast({
-        title: "❌ 오류 발생",
-        description: "운동 추천을 준비하는 중 오류가 발생했습니다.",
+        title: "❌ 운동 추천 실패",
+        description: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.',
         variant: "destructive",
-      })
+      });
+    } finally {
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleDeleteProfile = async (profileId: number) => {
     try {

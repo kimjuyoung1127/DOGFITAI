@@ -135,7 +135,7 @@ export function generateExerciseRecommendations(dogInfo: DogInfo): Exercise[] {
   }
 
   // If dog has health issues, further filter
-  if (dogInfo.healthIssues.length > 0) {
+  if (dogInfo.healthIssues && dogInfo.healthIssues.length > 0) {
     // This would be more sophisticated in a real app
     if (dogInfo.healthIssues.includes("joint")) {
       filteredExercises = filteredExercises.filter((e) => e.name !== "슬라롬 훈련")

@@ -48,34 +48,59 @@ export default function ResultPage() {
   const [customBenefit, setCustomBenefit] = useState("")
 
   useEffect(() => {
-    // Load dog info from localStorage
-    const savedDogInfo = getLocalStorageItem<DogInfo | null>("dogfit-dog-info", null)
-
-    if (savedDogInfo) {
-      setDogInfo(savedDogInfo)
-
-      // Get exercise recommendations
-      const recommendations = generateExerciseRecommendations(savedDogInfo)
-
-      // Load any custom exercises
-      const customExercises = getLocalStorageItem<CustomExercise[]>("dogfit-custom-exercises", [])
-
-      // Ensure all exercises have the isCustom property
+    // 로딩 상태 설정
+    setLoading(true);
+    
+    // 1. localStorage에서 추천 운동 데이터 가져오기
+    const savedRecommendations = getLocalStorageItem<Exercise[]>("dogfit-recommendations", []);
+    console.log("📥 localStorage에서 불러온 운동:", savedRecommendations);
+    
+    // 2. 강아지 정보 가져오기
+    const savedDogInfo = getLocalStorageItem<DogInfo | null>("dogfit-dog-info", null);
+    setDogInfo(savedDogInfo);
+    
+    if (savedRecommendations && savedRecommendations.length > 0) {
+      // API에서 받은 추천 운동이 있는 경우
+      console.log("✅ API 추천 운동 사용:", savedRecommendations.length, "개");
+      
+      // isCustom 속성 추가
+      const typedRecommendations = savedRecommendations.map(rec => ({
+        ...rec,
+        isCustom: false
+      }));
+      
+      // 커스텀 운동 가져오기
+      const customExercises = getLocalStorageItem<CustomExercise[]>("dogfit-custom-exercises", []);
+      
+      // 모든 운동 합치기
+      setExercises([...typedRecommendations, ...customExercises]);
+    } else if (savedDogInfo) {
+      // API 추천이 없지만 강아지 정보가 있는 경우 fallback으로 목업 데이터 생성
+      console.log("⚠️ API 추천 없음, 목업 데이터 사용");
+      const recommendations = generateExerciseRecommendations(savedDogInfo);
+      
+      // isCustom 속성 추가
       const typedRecommendations = recommendations.map(rec => ({
         ...rec,
         isCustom: false
-      }))
-
-      setExercises([...typedRecommendations, ...customExercises])
-
-      // Simulate loading
-      setTimeout(() => {
-        setLoading(false)
-      }, 1000)
+      }));
+      
+      // 커스텀 운동 가져오기
+      const customExercises = getLocalStorageItem<CustomExercise[]>("dogfit-custom-exercises", []);
+      
+      // 모든 운동 합치기
+      setExercises([...typedRecommendations, ...customExercises]);
     } else {
-      // No dog info, redirect to form
-      router.push("/form")
+      // 강아지 정보도 없는 경우 프로필 페이지로 리다이렉트
+      console.error("❌ 강아지 정보 없음, 프로필 페이지로 이동");
+      router.push("/profile");
+      return;
     }
+    
+    // 로딩 시뮬레이션 (UX 향상)
+    setTimeout(() => {
+      setLoading(false);
+    }, 1000);
   }, [router])
 
   const handlePrevious = () => {

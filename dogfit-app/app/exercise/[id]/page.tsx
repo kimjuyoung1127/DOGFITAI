@@ -28,41 +28,48 @@ export default function ExercisePage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     // Load exercises from localStorage
-    const recommendations = getLocalStorageItem<Exercise[]>("dogfit-recommendations", [])
-    const customExercises = getLocalStorageItem<CustomExercise[]>("dogfit-custom-exercises", [])
-    const allExercises = [...recommendations, ...customExercises]
+    const recommendations = getLocalStorageItem<Exercise[]>("dogfit-recommendations", []);
+    const customExercises = getLocalStorageItem<CustomExercise[]>("dogfit-custom-exercises", []);
+    const allExercises = [...recommendations, ...customExercises];
+    
+    console.log("📥 운동 상세 페이지 - 불러온 운동 목록:", allExercises.length, "개");
 
     // Find the exercise with the matching ID
-    const foundExercise = allExercises.find((ex) => ex.id === id)
+    const foundExercise = allExercises.find((ex) => ex.id === id);
 
     if (foundExercise) {
-      setExercise(foundExercise)
+      console.log("✅ 운동 찾음:", foundExercise.name);
+      setExercise(foundExercise);
     } else {
+      console.log("⚠️ 운동을 찾을 수 없음, 대체 방법 시도");
       // If no exercises in localStorage, generate them from the dog info
-      const dogInfo = getLocalStorageItem("dogfit-dog-info", null)
+      const dogInfo = getLocalStorageItem("dogfit-dog-info", null);
       if (dogInfo) {
-        const generatedExercises = generateExerciseRecommendations(dogInfo)
-        const foundGeneratedExercise = generatedExercises.find((ex) => ex.id === id)
+        const generatedExercises = generateExerciseRecommendations(dogInfo);
+        const foundGeneratedExercise = generatedExercises.find((ex) => ex.id === id);
         if (foundGeneratedExercise) {
+          console.log("✅ 생성된 운동에서 찾음:", foundGeneratedExercise.name);
           setExercise({
             ...foundGeneratedExercise,
             isCustom: false
-          })
+          });
         } else {
           // Exercise not found, redirect to results
-          router.push("/result")
+          console.error("❌ 운동을 찾을 수 없음, 결과 페이지로 이동");
+          router.push("/result");
         }
       } else {
         // No dog info, redirect to form
-        router.push("/form")
+        console.error("❌ 강아지 정보 없음, 폼 페이지로 이동");
+        router.push("/form");
       }
     }
 
     // Simulate loading
     setTimeout(() => {
-      setLoading(false)
-    }, 1000)
-  }, [id, router])
+      setLoading(false);
+    }, 1000);
+  }, [id, router]);
 
   if (loading) {
     return (
