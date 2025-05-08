@@ -892,8 +892,8 @@ export default function DogInfoForm() {
                         </span>
                       </div>
                       <div className="mt-1 flex justify-between text-xs text-gray-400">
-                        <span>낮음</span>
-                        <span>높음</span>
+                        <span>건강함</span>
+                        <span>심각함</span>
                       </div>
                     </div>
                   ))}
