@@ -27,6 +27,19 @@ import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 
+// 운동 이미지 파일명 추론 유틸 함수
+function getExerciseImageFilename(exercise: Exercise) {
+  const base = exercise.id?.replace(/\s+/g, '-').toLowerCase() || 'default';
+  const suffixMap = {
+    frontlegs: 'frontPawsOnly',
+    hindlegs: 'rearPawsElevated',
+    wholebody: 'fullBody',
+    bodyweight: 'bodyweight',
+  };
+  const suffix = suffixMap[exercise.contact as keyof typeof suffixMap] || 'default';
+  return `/images/exercises/${base}_${suffix}.png`;
+}
+
 export default function ResultPage() {
   const router = useRouter()
   const [dogInfo, setDogInfo] = useState<DogInfo | null>(null)
@@ -208,6 +221,9 @@ export default function ResultPage() {
   }
 
   const currentExercise = exercises[currentIndex]
+  
+  // 이미지 경로 계산
+  const exerciseImageUrl = currentExercise.imageUrl || getExerciseImageFilename(currentExercise);
 
   return (
     <div className="container flex flex-col items-center justify-center min-h-screen p-4">
@@ -238,14 +254,14 @@ export default function ResultPage() {
               </div>
               <div className="aspect-video bg-muted relative">
                 <Image
-                  src={
-                    currentExercise.imageUrl
-                      ? currentExercise.imageUrl
-                      : `/images/exercises/${currentExercise.id || "default"}.jpg`
-                  }
+                  src={exerciseImageUrl}
                   alt={currentExercise.name}
                   fill
                   className="object-cover"
+                  onError={(e) => {
+                    // 이미지 로드 실패 시 기본 이미지로 대체
+                    (e.target as HTMLImageElement).src = '/images/exercises/default.png';
+                  }}
                 />
               </div>
             </div>
