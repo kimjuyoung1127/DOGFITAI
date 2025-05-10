@@ -27,18 +27,81 @@ import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 
+// public/images/exercises 내부에 존재하는 이미지 파일명 목록 (확장자 제외)
+const availableImages = new Set([
+  "agility-pivot_fullBody",
+  "balance-donut_fullBody",
+  "balance-fitbone-stand_fullBody",
+  "circuit-roll_floorOnly",
+  "climbing-lowstep_frontPawsOnly",
+  "confidence-box_fullBody",
+  "core-elevated-push_rearPawsElevated",
+  "core-sitstand_bodyweight",
+  "donut-balance_frontPawsOnly",
+  "fitbone-static-stand_fullBody",
+  "focus-touchmat_bodyweight",
+  "jump-hurdle_bodyweight",
+  "strength-cavaletti-step_fullBody",
+  "strength-plank_fullBody",
+]);
+
 // 운동 이미지 파일명 추론 유틸 함수
 function getExerciseImageFilename(exercise: Exercise) {
-  const base = exercise.id?.replace(/\s+/g, '-').toLowerCase() || 'default';
+  const base = (exercise.id ?? '').replace(/\s+/g, '-').toLowerCase();
   const suffixMap = {
     frontlegs: 'frontPawsOnly',
     hindlegs: 'rearPawsElevated',
     wholebody: 'fullBody',
     bodyweight: 'bodyweight',
   };
-  const suffix = suffixMap[exercise.contact as keyof typeof suffixMap] || 'default';
-  return `/images/exercises/${base}_${suffix}.png`;
+  const suffix = suffixMap[exercise.contact as keyof typeof suffixMap] || '';
+
+  // 파일명 후보 리스트
+  const imageFiles = [
+    "agility-pivot_fullBody",
+    "balance-donut_fullBody",
+    "balance-fitbone-stand_fullBody",
+    "donut-balance_frontPawsOnly",
+    "fitbone-static-stand_fullBody",
+    "circuit-roll_floorOnly",
+    "climbing-lowstep_frontPawsOnly",
+    "confidence-box_fullBody",
+    "core-elevated-push_rearPawsElevated",
+    "core-sitstand_bodyweight",
+    "donut-balance_frontPawsOnly",
+    "fitbone-static-stand_fullBody",
+    "focus-touchmat_bodyweight",
+    "jump-hurdle_bodyweight",
+    "strength-cavaletti-step_fullBody",
+    "strength-plank_fullBody",
+  ];
+
+  // 일부만 일치하는 파일명 찾기 (하이픈/언더스코어/대소문자 무시)
+  const normalized = (str: string) => str.replace(/[-_]/g, '').toLowerCase();
+
+  // 1. base와 suffix 모두 포함 (가장 우선)
+  let match = imageFiles.find(filename =>
+    normalized(filename).includes(normalized(base)) &&
+    normalized(filename).includes(normalized(suffix))
+  );
+  // 2. base만 포함
+  if (!match) {
+    match = imageFiles.find(filename =>
+      normalized(filename).includes(normalized(base))
+    );
+  }
+  // 3. suffix만 포함
+  if (!match) {
+    match = imageFiles.find(filename =>
+      normalized(filename).includes(normalized(suffix))
+    );
+  }
+  if (match) {
+    return `/images/exercises/${match}.png`;
+  }
+  return `/images/exercises/default.png`;
 }
+
 
 export default function ResultPage() {
   const router = useRouter()
@@ -252,14 +315,15 @@ export default function ResultPage() {
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
-              <div className="aspect-video bg-muted relative">
+              <div className="aspect-square bg-muted flex justify-center items-center relative">
                 <Image
                   src={exerciseImageUrl}
                   alt={currentExercise.name}
-                  fill
-                  className="object-cover"
+                  width={220}
+                  height={220}
+                  className="object-contain"
+                  style={{ maxWidth: "80%", maxHeight: "80%" }}
                   onError={(e) => {
-                    // 이미지 로드 실패 시 기본 이미지로 대체
                     (e.target as HTMLImageElement).src = '/images/exercises/default.png';
                   }}
                 />

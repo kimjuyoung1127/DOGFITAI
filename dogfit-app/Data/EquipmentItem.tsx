@@ -10,15 +10,15 @@ const equipmentItems = [
       icon: <Triangle className="h-6 w-6" />,
     },
     {
-      key: "balance_cushion",
-      label: "밸런스 쿠션",
-      description: "푹신한 쿠션",
+      key: "balance_fitbone",
+      label: "밸런스 핏본",
+      description: "푹신한 핏본장비 – 중심 잡기 운동",
       icon: <Circle className="h-6 w-6" />,
     },
     {
-      key: "balance_disc",
-      label: "밸런스 디스크",
-      description: "흔들리는 원형 디스크 – 중심 잡기 운동",
+      key: "balance_Items",
+      label: "밸런스 장비 세트",
+      description: "흔들리는 기구 – 중심 잡기 운동",
       icon: <Disc className="h-6 w-6" />,
     },
     {
@@ -28,8 +28,8 @@ const equipmentItems = [
       icon: <CircleDot className="h-6 w-6" />,
     },
     {
-      key: "yoga_block",
-      label: "요가 블록",
+      key: "fitness_block",
+      label: "피트니스스 블록",
       description: "단단한 네모 블록 – 발 위치 인식 운동",
       icon: <Square className="h-6 w-6" />,
     },
