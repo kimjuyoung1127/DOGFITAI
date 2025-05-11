@@ -13,6 +13,8 @@ import { getLocalStorageItem, generateExerciseRecommendations } from "@/lib/util
 import { StampWidget } from "@/components/ui/stamp-widget"
 import { ArrowLeft, CheckCircle2 } from "lucide-react"
 import Link from "next/link"
+import { warmupSteps, cooldownSteps } from "@/lib/presets" // 추가
+import { Badge } from "@/components/ui/badge" // 추가
 
 export default function ExercisePlayPage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -21,6 +23,9 @@ export default function ExercisePlayPage({ params }: { params: { id: string } })
   const [currentStep, setCurrentStep] = useState(0)
   const [progress, setProgress] = useState(0)
   const [completed, setCompleted] = useState(false)
+
+  const [allDisplaySteps, setAllDisplaySteps] = useState<string[]>([]) // 추가
+  const [stepPhase, setStepPhase] = useState<"warmup" | "main" | "cooldown">("warmup") // 추가
 
   // params를 React.use()로 unwrap하고 id 가져오기
 // 기존 방식으로 돌아가기
@@ -33,10 +38,10 @@ export default function ExercisePlayPage({ params }: { params: { id: string } })
     const allExercises = [...recommendations, ...customExercises]
 
     // Find the exercise with the matching ID
-    const foundExercise = allExercises.find((ex) => ex.id === id)
+    let foundExercise = allExercises.find((ex) => ex.id === id)
 
     if (foundExercise) {
-      setExercise(foundExercise)
+      // setExercise(foundExercise) // 아래에서 allDisplaySteps 설정 후 함께 처리
     } else {
       // If no exercises in localStorage, generate them from the dog info
       const dogInfo = getLocalStorageItem("dogfit-dog-info", null)
@@ -45,15 +50,31 @@ export default function ExercisePlayPage({ params }: { params: { id: string } })
         const foundGeneratedExercise = generatedExercises.find((ex) => ex.id === id)
 
         if (foundGeneratedExercise) {
-          setExercise(foundGeneratedExercise)
+          foundExercise = foundGeneratedExercise // API에서 생성된 운동으로 설정
         } else {
           // Exercise not found, redirect to results
           router.push("/result")
+          return // useEffect 종료
         }
       } else {
         // No dog info, redirect to form
         router.push("/form")
+        return // useEffect 종료
       }
+    }
+
+    if (foundExercise) {
+      const mainSteps = foundExercise.steps || [];
+      // Always use preset as default, and only use custom if it's a non-empty array
+      let currentWarmupSteps: string[] = Array.isArray(foundExercise.warmupSteps) && foundExercise.warmupSteps.length > 0
+        ? foundExercise.warmupSteps
+        : Array.isArray(warmupSteps) ? warmupSteps : [];
+      let currentCooldownSteps: string[] = Array.isArray(foundExercise.cooldownSteps) && foundExercise.cooldownSteps.length > 0
+        ? foundExercise.cooldownSteps
+        : Array.isArray(cooldownSteps) ? cooldownSteps : [];
+      const allSteps = [...currentWarmupSteps, ...mainSteps, ...currentCooldownSteps];
+      setAllDisplaySteps(allSteps);
+      setExercise(foundExercise);
     }
 
     // Simulate loading
@@ -63,16 +84,32 @@ export default function ExercisePlayPage({ params }: { params: { id: string } })
   }, [id, router])
 
   useEffect(() => {
-    if (exercise) {
+    if (exercise && allDisplaySteps.length > 0) {
       // Calculate progress
-      setProgress(((currentStep + 1) / exercise.steps.length) * 100)
+      setProgress(((currentStep + 1) / allDisplaySteps.length) * 100)
+
+      // Determine step phase
+      const numWarmup = Array.isArray(exercise.warmupSteps)
+        ? exercise.warmupSteps.length
+        : Array.isArray(warmupSteps)
+          ? warmupSteps.length
+          : 0;
+      const numMain = Array.isArray(exercise.steps) ? exercise.steps.length : 0;
+      
+      if (currentStep < numWarmup) {
+        setStepPhase("warmup")
+      } else if (currentStep < numWarmup + numMain) {
+        setStepPhase("main")
+      } else {
+        setStepPhase("cooldown")
+      }
     }
-  }, [currentStep, exercise])
+  }, [currentStep, exercise, allDisplaySteps])
 
   const handleNextStep = () => {
-    if (!exercise) return
+    if (!exercise || allDisplaySteps.length === 0) return
 
-    if (currentStep < exercise.steps.length - 1) {
+    if (currentStep < allDisplaySteps.length - 1) {
       setCurrentStep(currentStep + 1)
     } else {
       setCompleted(true)
@@ -102,7 +139,7 @@ export default function ExercisePlayPage({ params }: { params: { id: string } })
     )
   }
 
-  if (!exercise) {
+  if (!exercise || allDisplaySteps.length === 0) { // allDisplaySteps 조건 추가
     return (
       <div className="container flex items-center justify-center min-h-screen p-4">
         <Card className="w-full max-w-md">
@@ -144,6 +181,13 @@ export default function ExercisePlayPage({ params }: { params: { id: string } })
               </div>
               <Progress value={progress} className="h-2" />
             </div>
+            
+            {/* 현재 루틴 타입 표시 */}
+            <div className="flex justify-center">
+              <Badge variant="secondary">
+                {stepPhase === "warmup" ? "운동 전 준비" : stepPhase === "cooldown" ? "마무리 운동" : "본 운동"}
+              </Badge>
+            </div>
 
             <AnimatePresence mode="wait">
               {completed ? (
@@ -175,10 +219,10 @@ export default function ExercisePlayPage({ params }: { params: { id: string } })
                 >
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold">
-                      단계 {currentStep + 1}/{exercise.steps.length}
+                      단계 {currentStep + 1}/{allDisplaySteps.length}
                     </h3>
                   </div>
-                  <p className="text-lg">{exercise.steps[currentStep]}</p>
+                  <p className="text-lg">{allDisplaySteps[currentStep]}</p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -193,7 +237,7 @@ export default function ExercisePlayPage({ params }: { params: { id: string } })
                 <Button variant="outline" onClick={handlePreviousStep} disabled={currentStep === 0}>
                   이전
                 </Button>
-                <Button onClick={handleNextStep}>{currentStep === exercise.steps.length - 1 ? "완료" : "다음"}</Button>
+                <Button onClick={handleNextStep}>{currentStep === allDisplaySteps.length - 1 ? "완료" : "다음"}</Button>
               </>
             )}
           </CardFooter>
