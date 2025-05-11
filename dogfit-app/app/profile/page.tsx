@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { User } from "@supabase/supabase-js"
 import Link from "next/link"
 import Image from "next/image"
-import { LogOut, PawPrint, Plus, Dumbbell, Beaker } from "lucide-react"
+import { LogOut, PawPrint, Plus } from "lucide-react"
 
 import type { DogProfile, DogProfileData } from "@/lib/types"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -18,7 +18,6 @@ import { getLocalStorageItem, setLocalStorageItem } from "@/lib/utils"
 import { upsertDogProfile } from "@/lib/supabase/upsertDogProfile"
 
 // 개발 테스트 모드 설정 (true로 설정하면 테스트 버튼이 표시됨)
-const devTestMode = true;
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -35,7 +34,6 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   
   // API 테스트용 상태 추가
-  const [apiTestLoading, setApiTestLoading] = useState<Record<number, boolean>>({})
 
   useEffect(() => {
     // 이미 처리 중인지 추적하는 플래그
@@ -425,68 +423,6 @@ export default function ProfilePage() {
     }
   }
 
-  // API 테스트 함수 추가
-  const handleApiTest = async (profileId: number) => {
-    // 중복 클릭 방지
-    if (apiTestLoading[profileId]) return;
-    
-    try {
-      // 로딩 상태 설정
-      setApiTestLoading(prev => ({ ...prev, [profileId]: true }));
-      
-      console.log(`🧪 프로필 ID ${profileId}에 대한 API 테스트 시작...`);
-      
-      // API 호출
-      const response = await fetch('/api/exercises', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ profileId }),
-      });
-      
-      // 응답 처리
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || '알 수 없는 오류가 발생했습니다.');
-      }
-      
-      // 콘솔에 결과 출력
-      console.log('✅ API 테스트 결과:', data);
-      
-      // 성공 토스트 메시지
-      toast({
-        title: "✅ API 테스트 성공",
-        description: `${data.recommendations?.length || 0}개의 운동 추천이 생성되었습니다.`,
-      });
-      
-    } catch (error) {
-      // 오류 처리
-      console.error('❌ API 테스트 실패:', error);
-      alert(`API 테스트 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
-    } finally {
-      // 로딩 상태 해제
-      setApiTestLoading(prev => ({ ...prev, [profileId]: false }));
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="container flex items-center justify-center min-h-screen p-4">
-        <div className="flex flex-col items-center">
-          <div className="animate-bounce mb-4">
-            <PawPrint size={48} className="text-orange-500" />
-          </div>
-          <p className="text-lg font-medium text-gray-600">잠시만 기다려주세요...</p>
-          {isSaving && (
-            <p className="text-sm text-orange-500 mt-2">임시 저장된 데이터를 처리 중입니다...</p>
-          )}
-        </div>
-      </div>
-    )
-  }
-
   if (!user) {
     return (
       <div className="container flex items-center justify-center min-h-screen p-4">
@@ -613,23 +549,11 @@ export default function ProfilePage() {
                     className="w-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center py-5 mb-4 rounded-lg shadow-sm"
                     onClick={() => handleExerciseRecommendation(profile.id)}
                   >
-                    <Dumbbell size={20} className="mr-2" />
+                    <PawPrint size={20} className="mr-2" />
                     <span className="font-medium">운동 추천받기</span>
                   </Button>
                   
-                  {/* 개발 테스트 모드일 때만 API 테스트 버튼 표시 */}
-                  {devTestMode && (
-                    <Button 
-                      className="w-full bg-purple-500 hover:bg-purple-600 text-white flex items-center justify-center py-5 mb-4 rounded-lg shadow-sm"
-                      onClick={() => handleApiTest(profile.id)}
-                      disabled={apiTestLoading[profile.id]}
-                    >
-                      <Beaker size={20} className="mr-2" />
-                      <span className="font-medium">
-                        {apiTestLoading[profile.id] ? "테스트 중..." : "운동 추천 API 테스트"}
-                      </span>
-                    </Button>
-                  )}
+              
                   
                   <div className="flex justify-between items-center mt-2">
                     <Button 

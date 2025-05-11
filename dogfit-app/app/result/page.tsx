@@ -503,7 +503,10 @@ export default function ResultPage() {
               </DialogContent>
             </Dialog>
 
-            <Link href={`/exercise/${currentExercise.id}`}>
+            <Link href={{
+              pathname: `/exercise/${currentExercise.id}`,
+              query: { imageUrl: exerciseImageUrl }
+            }}>
               <Button>상세 보기</Button>
             </Link>
             

@@ -20,6 +20,7 @@ export default function ExercisePage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const fromHistory = searchParams.get('from') === 'history'
+  const imageUrlFromQuery = searchParams.get('imageUrl') // <-- Add this line
   const [exercise, setExercise] = useState<Exercise | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -129,12 +130,14 @@ export default function ExercisePage({ params }: { params: { id: string } }) {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="aspect-video bg-muted relative">
+            <div className="aspect-square bg-muted flex justify-center items-center relative">
               <Image
-                src={exercise.imageUrl || "/placeholder.svg?height=200&width=400"}
+                src={imageUrlFromQuery || exercise.imageUrl || "/placeholder.svg?height=200&width=400"}
                 alt={exercise.name}
-                fill
-                className="object-cover"
+                width={220}
+                height={220}
+                className="object-contain"
+                style={{ maxWidth: "80%", maxHeight: "80%" }}
               />
             </div>
             <div className="p-6 space-y-4">
