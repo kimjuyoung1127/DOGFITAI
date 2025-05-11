@@ -195,7 +195,7 @@ export default function ExercisePage({ params }: { params: { id: string } }) {
             </div>
           </CardContent>
           <CardFooter className="flex justify-center p-6 pt-0">
-            <Link href={`/play/${exercise.id}`}>
+            <Link href={`/exercise/${exercise.id}/start`}>
               <Button className="w-full">
                 <Play className="h-4 w-4 mr-2" />
                 운동 시작하기

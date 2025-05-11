@@ -15,9 +15,15 @@ import { ArrowLeft, CheckCircle2 } from "lucide-react"
 import Link from "next/link"
 import { warmupSteps, cooldownSteps } from "@/lib/presets" // 추가
 import { Badge } from "@/components/ui/badge" // 추가
+import { useSearchParams } from "next/navigation"
+
 
 export default function ExercisePlayPage({ params }: { params: { id: string } }) {
   const router = useRouter()
+  const searchParams = useSearchParams();
+  const skipWarmup = searchParams.get("skipWarmup") === "true";
+
+  // 기존 useState
   const [exercise, setExercise] = useState<Exercise | null>(null)
   const [loading, setLoading] = useState(true)
   const [currentStep, setCurrentStep] = useState(0)
@@ -32,32 +38,42 @@ export default function ExercisePlayPage({ params }: { params: { id: string } })
   const id = params.id;
 
   useEffect(() => {
+    console.log("[PlayPage] id param:", id);
+    console.log("[PlayPage] searchParams:", searchParams.toString());
+    console.log("[PlayPage] skipWarmup:", skipWarmup);
+
     // Load exercises from localStorage
     const recommendations = getLocalStorageItem<Exercise[]>("dogfit-recommendations", [])
     const customExercises = getLocalStorageItem<CustomExercise[]>("dogfit-custom-exercises", [])
     const allExercises = [...recommendations, ...customExercises]
+    console.log("[PlayPage] allExercises:", allExercises);
 
     // Find the exercise with the matching ID
     let foundExercise = allExercises.find((ex) => ex.id === id)
+    console.log("[PlayPage] foundExercise:", foundExercise);
 
     if (foundExercise) {
       // setExercise(foundExercise) // 아래에서 allDisplaySteps 설정 후 함께 처리
     } else {
       // If no exercises in localStorage, generate them from the dog info
       const dogInfo = getLocalStorageItem("dogfit-dog-info", null)
+      console.log("[PlayPage] dogInfo:", dogInfo);
       if (dogInfo) {
         const generatedExercises = generateExerciseRecommendations(dogInfo)
         const foundGeneratedExercise = generatedExercises.find((ex) => ex.id === id)
+        console.log("[PlayPage] foundGeneratedExercise:", foundGeneratedExercise);
 
         if (foundGeneratedExercise) {
           foundExercise = foundGeneratedExercise // API에서 생성된 운동으로 설정
         } else {
           // Exercise not found, redirect to results
+          console.log("[PlayPage] 운동을 찾을 수 없어 /result로 이동");
           router.push("/result")
           return // useEffect 종료
         }
       } else {
         // No dog info, redirect to form
+        console.log("[PlayPage] 강아지 정보 없음, /form으로 이동");
         router.push("/form")
         return // useEffect 종료
       }
@@ -65,7 +81,6 @@ export default function ExercisePlayPage({ params }: { params: { id: string } })
 
     if (foundExercise) {
       const mainSteps = foundExercise.steps || [];
-      // Always use preset as default, and only use custom if it's a non-empty array
       let currentWarmupSteps: string[] = Array.isArray(foundExercise.warmupSteps) && foundExercise.warmupSteps.length > 0
         ? foundExercise.warmupSteps
         : Array.isArray(warmupSteps) ? warmupSteps : [];
@@ -73,15 +88,24 @@ export default function ExercisePlayPage({ params }: { params: { id: string } })
         ? foundExercise.cooldownSteps
         : Array.isArray(cooldownSteps) ? cooldownSteps : [];
       const allSteps = [...currentWarmupSteps, ...mainSteps, ...currentCooldownSteps];
+      console.log("[PlayPage] allDisplaySteps:", allSteps);
       setAllDisplaySteps(allSteps);
       setExercise(foundExercise);
+
+      // skipWarmup이 true면 main 단계의 첫 index로 currentStep 설정
+      if (skipWarmup) {
+        console.log("[PlayPage] skipWarmup이 true, currentStep을", currentWarmupSteps.length, "로 설정");
+        setCurrentStep(currentWarmupSteps.length);
+      } else {
+        setCurrentStep(0);
+      }
     }
 
     // Simulate loading
     setTimeout(() => {
       setLoading(false)
     }, 1000)
-  }, [id, router])
+  }, [id, router, skipWarmup])
 
   useEffect(() => {
     if (exercise && allDisplaySteps.length > 0) {
