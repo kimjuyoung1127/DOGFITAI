@@ -11,7 +11,6 @@ export interface DogInfo {
 }
 
 export interface Exercise {
-  isCustom: any;
   id: string
   name: string
   description: string
@@ -21,6 +20,9 @@ export interface Exercise {
   steps: string[]
   benefits: string[]
   imageUrl?: string
+  warmupSteps?: string[] // 추가: 준비운동 단계
+  cooldownSteps?: string[] // 추가: 마무리운동 단계
+  isCustom: boolean; // ← 이 줄을 추가
 }
 
 export interface CustomExercise extends Exercise {

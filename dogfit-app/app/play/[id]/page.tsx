@@ -64,7 +64,9 @@ export default function ExercisePlayPage({ params }: { params: { id: string } })
         console.log("[PlayPage] foundGeneratedExercise:", foundGeneratedExercise);
 
         if (foundGeneratedExercise) {
-          foundExercise = foundGeneratedExercise // API에서 생성된 운동으로 설정
+          foundExercise = { ...foundGeneratedExercise, isCustom: false } // Set generated exercise with isCustom property
+          
+
         } else {
           // Exercise not found, redirect to results
           console.log("[PlayPage] 운동을 찾을 수 없어 /result로 이동");
