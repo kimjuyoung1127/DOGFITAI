@@ -236,6 +236,16 @@ export default function HistoryPage() {
           </Link>
           <h1 className="text-2xl font-bold text-center flex-1 mr-9">나의 운동기록</h1>
         </div>
+        <div className="mb-4">
+          <Link href="/profile">
+            <Button
+              className="w-full bg-orange-400 hover:bg-orange-500 text-white flex items-center justify-center py-4 rounded-lg shadow-sm"
+            >
+              <ArrowLeft className="mr-2" size={18} />
+              <span className="font-medium">프로필로 돌아가기</span>
+            </Button>
+          </Link>
+        </div>
         
         {history.length > 0 && (
           <div className="mb-6 p-4 bg-white rounded-lg shadow-sm">

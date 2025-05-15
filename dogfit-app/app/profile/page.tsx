@@ -16,6 +16,7 @@ import { supabase } from "@/lib/supabase/supabaseClient"
 import { useToast } from "@/components/ui/use-toast"
 import { getLocalStorageItem, setLocalStorageItem } from "@/lib/utils"
 import { upsertDogProfile } from "@/lib/supabase/upsertDogProfile"
+import { Clock } from "lucide-react"
 
 // 개발 테스트 모드 설정 (true로 설정하면 테스트 버튼이 표시됨)
 
@@ -552,6 +553,15 @@ export default function ProfilePage() {
                     <PawPrint size={20} className="mr-2" />
                     <span className="font-medium">운동 추천받기</span>
                   </Button>
+
+                  <Button
+                    className="w-full bg-purple-500 hover:bg-purple-600 text-white flex items-center justify-center py-5 mb-4 rounded-lg shadow-sm"
+                    onClick={() => router.push('/history')}
+                  >
+                    <Clock className="mr-2" size={20} />
+                    <span className="font-medium">운동 기록 보러가기</span>
+                  </Button>
+                  
                   
               
                   
