@@ -51,11 +51,19 @@ export default function CompletePage({ params }: { params: { id: string } }) {
         const generatedExercises = generateExerciseRecommendations(savedDogInfo)
         const foundGeneratedExercise = generatedExercises.find((ex) => ex.id === id)
         if (foundGeneratedExercise) {
+          const normalizedSteps =
+            Array.isArray(foundGeneratedExercise.steps) && foundGeneratedExercise.steps.length > 0 && typeof foundGeneratedExercise.steps[0] === "string"
+              ? (foundGeneratedExercise.steps as string[]).map((s) => ({ step: s, stepDuration: 60 }))
+              : Array.isArray(foundGeneratedExercise.steps)
+                ? foundGeneratedExercise.steps as { step: string; stepDuration: number }[]
+                : [];
+          
           const exerciseWithCustomFlag = {
             ...foundGeneratedExercise,
-            isCustom: false
-          }
-          setExercise(exerciseWithCustomFlag)
+            isCustom: false,
+            steps: normalizedSteps
+          };
+          setExercise(exerciseWithCustomFlag);
           
           // 운동 완료 데이터를 히스토리에 저장
           saveExerciseToHistory(exerciseWithCustomFlag, savedDogInfo)

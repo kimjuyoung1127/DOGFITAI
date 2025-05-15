@@ -54,7 +54,12 @@ function getExerciseImageFilename(exercise: Exercise) {
     wholebody: 'fullBody',
     bodyweight: 'bodyweight',
   };
-  const suffix = suffixMap[exercise.contact as keyof typeof suffixMap] || '';
+
+  // contact 값이 올바른지 체크 (없거나 잘못된 값이면 기본값 사용)
+  const contactKey = typeof exercise.contact === "string" && suffixMap.hasOwnProperty(exercise.contact)
+    ? exercise.contact
+    : "bodyweight";
+  const suffix = suffixMap[contactKey as keyof typeof suffixMap];
 
   // 파일명 후보 리스트
   const imageFiles = [
@@ -126,44 +131,61 @@ export default function ResultPage() {
   useEffect(() => {
     // 로딩 상태 설정
     setLoading(true);
-    
+
     // 1. localStorage에서 추천 운동 데이터 가져오기
     const savedRecommendations = getLocalStorageItem<Exercise[]>("dogfit-recommendations", []);
     console.log("📥 localStorage에서 불러온 운동:", savedRecommendations);
-    
+
     // 2. 강아지 정보 가져오기
     const savedDogInfo = getLocalStorageItem<DogInfo | null>("dogfit-dog-info", null);
     setDogInfo(savedDogInfo);
-    
+
+    // steps 변환 함수
+    const normalizeSteps = (steps: any) => {
+      if (!steps) return [];
+      if (Array.isArray(steps) && typeof steps[0] === "string") {
+        return steps.map((s: string) => ({ step: s, stepDuration: 60 }));
+      }
+      return steps;
+    };
+
     if (savedRecommendations && savedRecommendations.length > 0) {
       // API에서 받은 추천 운동이 있는 경우
       console.log("✅ API 추천 운동 사용:", savedRecommendations.length, "개");
-      
-      // isCustom 속성 추가
+
+      // isCustom 속성 추가 및 steps 변환
       const typedRecommendations = savedRecommendations.map(rec => ({
         ...rec,
-        isCustom: false
+        isCustom: false,
+        steps: normalizeSteps(rec.steps),
       }));
-      
-      // 커스텀 운동 가져오기
-      const customExercises = getLocalStorageItem<CustomExercise[]>("dogfit-custom-exercises", []);
-      
+
+      // 커스텀 운동 가져오기 및 steps 변환
+      const customExercises = getLocalStorageItem<CustomExercise[]>("dogfit-custom-exercises", []).map(rec => ({
+        ...rec,
+        steps: normalizeSteps(rec.steps),
+      }));
+
       // 모든 운동 합치기
       setExercises([...typedRecommendations, ...customExercises]);
     } else if (savedDogInfo) {
       // API 추천이 없지만 강아지 정보가 있는 경우 fallback으로 목업 데이터 생성
       console.log("⚠️ API 추천 없음, 목업 데이터 사용");
       const recommendations = generateExerciseRecommendations(savedDogInfo);
-      
-      // isCustom 속성 추가
+
+      // isCustom 속성 추가 및 steps 변환
       const typedRecommendations = recommendations.map(rec => ({
         ...rec,
-        isCustom: false
+        isCustom: false,
+        steps: normalizeSteps(rec.steps),
       }));
-      
-      // 커스텀 운동 가져오기
-      const customExercises = getLocalStorageItem<CustomExercise[]>("dogfit-custom-exercises", []);
-      
+
+      // 커스텀 운동 가져오기 및 steps 변환
+      const customExercises = getLocalStorageItem<CustomExercise[]>("dogfit-custom-exercises", []).map(rec => ({
+        ...rec,
+        steps: normalizeSteps(rec.steps),
+      }));
+
       // 모든 운동 합치기
       setExercises([...typedRecommendations, ...customExercises]);
     } else {
@@ -172,7 +194,7 @@ export default function ResultPage() {
       router.push("/profile");
       return;
     }
-    
+
     // 로딩 시뮬레이션 (UX 향상)
     setTimeout(() => {
       setLoading(false);
@@ -190,6 +212,15 @@ export default function ResultPage() {
   const handleAddCustomExercise = () => {
     if (!customExercise.name || !customExercise.description) return
 
+    // steps 변환
+    const normalizeSteps = (steps: any) => {
+      if (!steps) return [];
+      if (Array.isArray(steps) && typeof steps[0] === "string") {
+        return steps.map((s: string) => ({ step: s, stepDuration: 60 }));
+      }
+      return steps;
+    };
+
     const newExercise: CustomExercise = {
       id: `custom-${Date.now()}`,
       name: customExercise.name || "",
@@ -197,7 +228,7 @@ export default function ResultPage() {
       difficulty: (customExercise.difficulty as "easy" | "medium" | "hard") || "medium",
       duration: customExercise.duration || 10,
       equipment: customExercise.equipment || [],
-      steps: customExercise.steps || [],
+      steps: normalizeSteps(customExercise.steps),
       benefits: customExercise.benefits || [],
       isCustom: true,
     }
@@ -242,7 +273,10 @@ export default function ResultPage() {
     if (!customStep) return
     setCustomExercise({
       ...customExercise,
-      steps: [...(customExercise.steps || []), customStep],
+      steps: [
+        ...(customExercise.steps || []),
+        { step: customStep, stepDuration: 60 }, // step 객체로 추가
+      ],
     })
     setCustomStep("")
   }
@@ -375,6 +409,19 @@ export default function ResultPage() {
                   ))}
                 </div>
               </div>
+
+              <div>
+                <h3 className="font-bold mb-2">운동 단계</h3>
+                <ol className="list-decimal pl-4 space-y-1">
+                  {Array.isArray(currentExercise.steps) && currentExercise.steps.map((stepObj, idx) => (
+                    <li key={idx}>
+                      {typeof stepObj === "string"
+                        ? stepObj
+                        : `${stepObj.step}${stepObj.stepDuration ? ` (${stepObj.stepDuration}초)` : ""}`}
+                    </li>
+                  ))}
+                </ol>
+              </div>
             </div>
           </CardContent>
           <CardFooter className="flex justify-between p-6 pt-0">
@@ -466,9 +513,9 @@ export default function ResultPage() {
                       </Button>
                     </div>
                     <div className="space-y-2 mt-2">
-                      {customExercise.steps?.map((step, index) => (
+                      {customExercise.steps?.map((stepObj, index) => (
                         <div key={index} className="bg-secondary p-2 rounded-md text-sm">
-                          {index + 1}. {step}
+                          {index + 1}. {typeof stepObj === "string" ? stepObj : stepObj.step}
                         </div>
                       ))}
                     </div>

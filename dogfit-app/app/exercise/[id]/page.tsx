@@ -50,9 +50,15 @@ export default function ExercisePage({ params }: { params: { id: string } }) {
         const foundGeneratedExercise = generatedExercises.find((ex) => ex.id === id);
         if (foundGeneratedExercise) {
           console.log("✅ 생성된 운동에서 찾음:", foundGeneratedExercise.name);
+          const normalizedSteps =
+            Array.isArray(foundGeneratedExercise.steps) && typeof foundGeneratedExercise.steps[0] === "string"
+              ? (foundGeneratedExercise.steps as string[]).map((s) => ({ step: s, stepDuration: 60 }))
+              : (foundGeneratedExercise.steps as { step: string; stepDuration: number }[]);
+          
           setExercise({
             ...foundGeneratedExercise,
-            isCustom: false
+            isCustom: false,
+            steps: normalizedSteps
           });
         } else {
           // Exercise not found, redirect to results
@@ -174,9 +180,12 @@ export default function ExercisePage({ params }: { params: { id: string } }) {
               <div>
                 <h3 className="font-bold mb-2">운동 단계</h3>
                 <div className="space-y-2">
-                  {exercise.steps.map((step, index) => (
+                  {Array.isArray(exercise.steps) && exercise.steps.map((step, index) => (
                     <div key={index} className="bg-secondary p-3 rounded-lg text-sm">
-                      <span className="font-bold mr-2">{index + 1}.</span> {step}
+                      <span className="font-bold mr-2">{index + 1}.</span>
+                      {typeof step === "string"
+                        ? step
+                        : `${step.step}${step.stepDuration ? ` (${step.stepDuration}초)` : ""}`}
                     </div>
                   ))}
                 </div>

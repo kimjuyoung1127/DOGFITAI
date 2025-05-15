@@ -85,7 +85,7 @@ export async function POST(request: Request) {
 2. 사용 가능한 기구가 있다면 이를 활용한 운동을, 없다면 맨몸 운동(bodyweight only)을 제안해주세요.
 3. 운동 난이도는 나이, 건강 민감도, 운동 능력 수치를 고려하여 현실적으로 조정해주세요.
 4. 운동은 **총 3가지**, **서로 다른 목적(예: 균형감각 / 근력 / 유연성 등)**을 가지도록 구성해주세요.
-5. 각 운동은 **5~15분** 이내로 보호자가 실내에서 함께 진행 가능한 수준이어야 합니다.
+5. 각 운동은 **총 소요시간(totalDuration) 기준으로 5~15분(300~900초)** 이내로 보호자가 실내에서 함께 진행 가능한 수준이어야 합니다.
 6. 각 운동의 steps는 최소 **5단계 이상**으로 구성하며, 
    **구체적이고 보호자가 따라 하기 쉬운 언어로 작성**해주세요.
    각 단계에는 "어떻게 시도해야 하는지", "어떤 보조 동작이 필요한지", "반려견의 반응에 따라 조절하는 팁"을 포함하세요.
@@ -111,6 +111,23 @@ export async function POST(request: Request) {
 - 예: "Donut Balance" → "donut-balance"
 
 
+🛠 **추가 요구 사항 - 타이머 기능 적용 (본 운동에만 적용)**
+기존 운동 추천 시스템을 개선하여 **각 운동 단계(\`steps\`)에만 타이머 기능을 추가**하고, 이를 앱의 UI와 연동할 수 있도록 운동 데이터를 제공해주세요.
+
+📌 다음 타이머 관련 조건을 반드시 포함해주세요:
+1️⃣ **운동 전체 소요 시간(\`totalDuration\`)을 제공해야 합니다.**
+   - \`totalDuration\` 값은 본 운동(\`steps\`)의 각 \`stepDuration\` 합으로 계산하며, 단위는 초(seconds)입니다.
+   - 웜업(\`warmupSteps\`)과 쿨다운(\`cooldownSteps\`) 단계의 시간은 \`totalDuration\`에 포함하지 않습니다. (참고: 현재 프롬프트에서는 웜업/쿨다운 단계를 명시적으로 요구하고 있지 않으나, 향후 확장성을 고려한 규칙입니다.)
+
+2️⃣ **각 운동 단계(\`steps\`)에 \`stepDuration\` 값을 추가해야 합니다.**
+   - \`steps\` 배열 내부의 각 단계별 수행 시간을 **초(\`seconds\`) 단위**로 \`stepDuration\` 필드에 명시하세요.
+   - 웜업(\`warmupSteps\`)과 쿨다운(\`cooldownSteps\`)에는 \`stepDuration\`을 포함하지 않습니다.
+
+3️⃣ **운동 진행 상태(\`status\`)는 본 운동(\`steps\`)에만 적용해야 합니다.**
+   - 각 운동 객체에 \`status\` 필드를 추가하고, 값은 초기에 항상 "notStarted"로 설정합니다. ("notStarted" | "inProgress" | "completed" 중 하나)
+   - 웜업(\`warmupSteps\`)과 쿨다운(\`cooldownSteps\`)에는 상태 관리가 적용되지 않습니다.
+
+
 📦 응답 형식:
 
 {
@@ -131,9 +148,10 @@ export async function POST(request: Request) {
       ]
 
       "benefits": ["균형감각 향상", "코어 안정성", "근육 조절력 증가"],
-      "contact": "frontlegs"
+      "contact": "frontlegs" // "frontlegs" | "hindlegs" | "wholebody" | "bodyweight"
     }
-    // 총 3개의 운동 추천
+    // 여기에 두 번째 운동 추천 객체
+    // 여기에 세 번째 운동 추천 객체 (총 3개의 운동 추천)
   ]
 }
 
@@ -222,4 +240,4 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-} 
+}

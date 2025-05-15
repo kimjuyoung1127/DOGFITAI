@@ -17,12 +17,15 @@ export interface Exercise {
   difficulty: "easy" | "medium" | "hard"
   duration: number
   equipment: string[]
-  steps: string[]
+  steps: { step: string; stepDuration: number }[] // ← 수정
   benefits: string[]
   imageUrl?: string
   warmupSteps?: string[] // 추가: 준비운동 단계
   cooldownSteps?: string[] // 추가: 마무리운동 단계
-  isCustom: boolean; // ← 이 줄을 추가
+  stepDurations?: number[] // 각 단계별 타이머(초 단위)
+  totalDurationSec?: number // 전체 운동 타이머(초 단위)
+  isCustom: boolean; // ← 기존 필드
+  contact?: string; // 운동 시 접촉 부위(예: "frontlegs", "hindlegs", "wholebody", "bodyweight" 등)
 }
 
 export interface CustomExercise extends Exercise {
