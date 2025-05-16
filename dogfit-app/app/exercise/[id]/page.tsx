@@ -1,7 +1,6 @@
 "use client"
 
-import React from 'react'
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,22 +19,21 @@ export default function ExercisePage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const fromHistory = searchParams.get('from') === 'history'
-  const imageUrlFromQuery = searchParams.get('imageUrl') // <-- Add this line
+  const imageUrlFromQuery = searchParams.get('imageUrl')
   const [exercise, setExercise] = useState<Exercise | null>(null)
   const [loading, setLoading] = useState(true)
+  const [history, setHistory] = useState<HistoryItem[]>([])
+  const [filteredHistory, setFilteredHistory] = useState<HistoryItem[]>([])
 
-  // 기존 방식으로 돌아가기
   const id = params.id;
 
   useEffect(() => {
-    // Load exercises from localStorage
     const recommendations = getLocalStorageItem<Exercise[]>("dogfit-recommendations", []);
     const customExercises = getLocalStorageItem<CustomExercise[]>("dogfit-custom-exercises", []);
     const allExercises = [...recommendations, ...customExercises];
     
     console.log("📥 운동 상세 페이지 - 불러온 운동 목록:", allExercises.length, "개");
 
-    // Find the exercise with the matching ID
     const foundExercise = allExercises.find((ex) => ex.id === id);
 
     if (foundExercise) {
@@ -43,17 +41,15 @@ export default function ExercisePage({ params }: { params: { id: string } }) {
       setExercise(foundExercise);
     } else {
       console.log("⚠️ 운동을 찾을 수 없음, 대체 방법 시도");
-      // If no exercises in localStorage, generate them from the dog info
       const dogInfo = getLocalStorageItem("dogfit-dog-info", null);
       if (dogInfo) {
         const generatedExercises = generateExerciseRecommendations(dogInfo);
         const foundGeneratedExercise = generatedExercises.find((ex) => ex.id === id);
         if (foundGeneratedExercise) {
           console.log("✅ 생성된 운동에서 찾음:", foundGeneratedExercise.name);
-          const normalizedSteps =
-            Array.isArray(foundGeneratedExercise.steps) && typeof foundGeneratedExercise.steps[0] === "string"
-              ? (foundGeneratedExercise.steps as string[]).map((s) => ({ step: s, stepDuration: 60 }))
-              : (foundGeneratedExercise.steps as { step: string; stepDuration: number }[]);
+          const normalizedSteps = Array.isArray(foundGeneratedExercise.steps) && typeof foundGeneratedExercise.steps[0] === "string"
+            ? (foundGeneratedExercise.steps as string[]).map((s) => ({ step: s, stepDuration: 60 }))
+            : (foundGeneratedExercise.steps as unknown as { step: string; stepDuration: number }[]);
           
           setExercise({
             ...foundGeneratedExercise,
@@ -61,22 +57,36 @@ export default function ExercisePage({ params }: { params: { id: string } }) {
             steps: normalizedSteps
           });
         } else {
-          // Exercise not found, redirect to results
           console.error("❌ 운동을 찾을 수 없음, 결과 페이지로 이동");
           router.push("/result");
         }
       } else {
-        // No dog info, redirect to form
         console.error("❌ 강아지 정보 없음, 폼 페이지로 이동");
         router.push("/form");
       }
     }
 
-    // Simulate loading
+    // Load history data
+    loadHistoryData();
+
     setTimeout(() => {
       setLoading(false);
     }, 1000);
   }, [id, router]);
+
+  const loadHistoryData = () => {
+    if (!id) return;
+    
+    const historyKey = `dogfit-history-${id}`;
+    const historyData = getLocalStorageItem<HistoryItem[]>(historyKey, []);
+    
+    const sortedHistory = [...historyData].sort((a, b) => 
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+    
+    setHistory(sortedHistory);
+    setFilteredHistory(sortedHistory);
+  };
 
   if (loading) {
     return (
@@ -169,11 +179,11 @@ export default function ExercisePage({ params }: { params: { id: string } }) {
               <div>
                 <h3 className="font-bold mb-2">필요 장비</h3>
                 <div className="flex flex-wrap gap-2">
-                  {exercise.equipment.map((item, index) => (
+                  {exercise.equipment?.map((item, index) => (
                     <Badge key={index} variant="secondary">
                       {item}
                     </Badge>
-                  ))}
+                  )) || <span>장비 정보가 없습니다.</span>}
                 </div>
               </div>
 
@@ -194,11 +204,11 @@ export default function ExercisePage({ params }: { params: { id: string } }) {
               <div>
                 <h3 className="font-bold mb-2">기대 효과</h3>
                 <div className="flex flex-wrap gap-2">
-                  {exercise.benefits.map((benefit, index) => (
+                  {exercise.benefits?.map((benefit, index) => (
                     <Badge key={index} variant="outline">
                       {benefit}
                     </Badge>
-                  ))}
+                  )) || <span>효과 정보가 없습니다.</span>}
                 </div>
               </div>
             </div>
@@ -216,4 +226,17 @@ export default function ExercisePage({ params }: { params: { id: string } }) {
       <StampWidget />
     </div>
   )
+}
+
+// Define the HistoryItem type
+interface HistoryItem {
+  id: string;
+  name: string;
+  date: string;
+  duration: number;
+  isCustom: boolean;
+  difficulty: "easy" | "medium" | "hard";
+  dogName: string;
+  equipmentUsed: string[];
+  benefits: string[];
 }

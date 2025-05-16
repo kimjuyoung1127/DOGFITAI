@@ -34,45 +34,40 @@ export default function CompletePage({ params }: { params: { id: string } }) {
     const allExercises = [...recommendations, ...customExercises]
 
     // Find the exercise with the matching ID
-    const foundExercise = allExercises.find((ex) => ex.id === id)
+    let foundExercise = allExercises.find((ex) => ex.id === id)
 
     // Load dog info
     const savedDogInfo = getLocalStorageItem<DogInfo | null>("dogfit-dog-info", null)
     setDogInfo(savedDogInfo)
 
+    // 운동 찾기 (로컬 → 생성)
+    if (!foundExercise && savedDogInfo) {
+      const generatedExercises = generateExerciseRecommendations(savedDogInfo)
+      const foundGeneratedExercise = generatedExercises.find((ex) => ex.id === id)
+      if (foundGeneratedExercise) {
+        const normalizedSteps = Array.isArray(foundGeneratedExercise.steps) && foundGeneratedExercise.steps.length > 0
+          ? foundGeneratedExercise.steps.map((s: string | { step: string; stepDuration: number }) => ({
+              step: typeof s === "string" ? s : s.step,
+              stepDuration: typeof s === "string" ? 60 : s.stepDuration
+            }))
+          : [];
+        foundExercise = {
+          ...foundGeneratedExercise,
+          isCustom: false,
+          steps: normalizedSteps
+        }
+      }
+    }
+
     if (foundExercise) {
       setExercise(foundExercise)
-      
-      // 운동 완료 데이터를 히스토리에 저장
+      // 운동 완료 데이터를 히스토리에 저장 (한 번만 호출)
       saveExerciseToHistory(foundExercise, savedDogInfo)
     } else {
-      // If no exercises in localStorage, generate them from the dog info
+      // 운동을 찾지 못한 경우
       if (savedDogInfo) {
-        const generatedExercises = generateExerciseRecommendations(savedDogInfo)
-        const foundGeneratedExercise = generatedExercises.find((ex) => ex.id === id)
-        if (foundGeneratedExercise) {
-          const normalizedSteps =
-            Array.isArray(foundGeneratedExercise.steps) && foundGeneratedExercise.steps.length > 0 && typeof foundGeneratedExercise.steps[0] === "string"
-              ? (foundGeneratedExercise.steps as string[]).map((s) => ({ step: s, stepDuration: 60 }))
-              : Array.isArray(foundGeneratedExercise.steps)
-                ? foundGeneratedExercise.steps as { step: string; stepDuration: number }[]
-                : [];
-          
-          const exerciseWithCustomFlag = {
-            ...foundGeneratedExercise,
-            isCustom: false,
-            steps: normalizedSteps
-          };
-          setExercise(exerciseWithCustomFlag);
-          
-          // 운동 완료 데이터를 히스토리에 저장
-          saveExerciseToHistory(exerciseWithCustomFlag, savedDogInfo)
-        } else {
-          // Exercise not found, redirect to results
-          router.push("/result")
-        }
+        router.push("/result")
       } else {
-        // No dog info, redirect to form
         router.push("/form")
       }
     }
@@ -95,7 +90,11 @@ export default function CompletePage({ params }: { params: { id: string } }) {
   // 운동 완료 데이터를 히스토리에 저장하는 함수
   const saveExerciseToHistory = (exercise: Exercise, dogInfo: DogInfo | null) => {
     if (!exercise || !dogInfo) return;
-    
+
+    const profileId = getLocalStorageItem("dogfit-selected-profile-id", null);
+    if (!profileId) return;
+
+    const historyKey = `dogfit-history-${profileId}`;
     const historyEntry = {
       id: exercise.id,
       name: exercise.name,
@@ -107,15 +106,26 @@ export default function CompletePage({ params }: { params: { id: string } }) {
       equipmentUsed: exercise.equipment || [],
       benefits: exercise.benefits || []
     };
-    
+
     // 기존 히스토리 가져오기
-    const existingHistory = getLocalStorageItem('dogfit-history', []);
-    
+    const existingHistory = getLocalStorageItem(historyKey, []);
+
+    // 이미 동일한 id와 date(ISO string 앞 16자리까지, 즉 분 단위)가 있으면 저장하지 않음
+    const isAlreadySaved = existingHistory.some(
+      (item: any) =>
+        item.id === historyEntry.id &&
+        item.date?.slice(0, 16) === historyEntry.date.slice(0, 16)
+    );
+    if (isAlreadySaved) {
+      // 이미 저장된 경우 추가하지 않음
+      return;
+    }
+
     // 새 항목 추가
-    const updatedHistory = [...existingHistory, historyEntry];
-    
+    const updatedHistory = [historyEntry, ...existingHistory];
+
     // localStorage에 저장
-    setLocalStorageItem('dogfit-history', updatedHistory);
+    setLocalStorageItem(historyKey, updatedHistory);
   };
 
   const handleShareTwitter = () => {

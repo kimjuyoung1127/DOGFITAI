@@ -50,13 +50,12 @@ export default function ExercisePlayPage({ params }: { params: { id: string } })
           // steps가 string[]이면 변환 (빈 배열/undefined 방어)
           const steps =
             Array.isArray(foundGeneratedExercise.steps) &&
-            foundGeneratedExercise.steps.length > 0 &&
-            typeof foundGeneratedExercise.steps[0] === "string"
-              ? foundGeneratedExercise.steps.map((s) => ({
-                  step: s,
-                  stepDuration: 60, // 기본값(초) 지정, 필요시 조정
+            foundGeneratedExercise.steps.length > 0
+              ? foundGeneratedExercise.steps.map((s: string | { step: string; stepDuration: number }) => ({
+                  step: typeof s === "string" ? s : s.step,
+                  stepDuration: typeof s === "string" ? 60 : s.stepDuration
                 }))
-              : foundGeneratedExercise.steps;
+              : [];
           foundExercise = {
             ...foundGeneratedExercise,
             steps,
@@ -81,6 +80,8 @@ export default function ExercisePlayPage({ params }: { params: { id: string } })
             ? (foundExercise.steps as { step: string; stepDuration: number }[])
             : [];
       
+      // If you need to convert this to a string array containing only the step descriptions:
+      const stepDescriptions: string[] = mainSteps.map(stepObj => stepObj.step);
       // Warmup/Cooldown normalization remains the same
       const currentWarmupSteps = Array.isArray(foundExercise.warmupSteps) && foundExercise.warmupSteps.length > 0
         ? foundExercise.warmupSteps.map((s) => ({ step: s, stepDuration: 30 }))

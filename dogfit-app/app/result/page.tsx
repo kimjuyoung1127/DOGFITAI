@@ -391,22 +391,22 @@ export default function ResultPage() {
               <div>
                 <h3 className="font-bold mb-2">필요 장비</h3>
                 <div className="flex flex-wrap gap-2">
-                  {currentExercise.equipment.map((item, index) => (
+                  {currentExercise.equipment?.map((item, index) => (
                     <Badge key={index} variant="secondary">
                       {item}
                     </Badge>
-                  ))}
+                  )) || <span>장비 정보가 없습니다.</span>}
                 </div>
               </div>
 
               <div>
                 <h3 className="font-bold mb-2">기대 효과</h3>
                 <div className="flex flex-wrap gap-2">
-                  {currentExercise.benefits.map((benefit, index) => (
+                  {currentExercise.benefits?.map((benefit, index) => (
                     <Badge key={index} variant="outline">
                       {benefit}
                     </Badge>
-                  ))}
+                  )) || <span>효과 정보가 없습니다.</span>}
                 </div>
               </div>
 

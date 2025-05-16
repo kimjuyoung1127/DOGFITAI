@@ -72,27 +72,33 @@ export default function HistoryPage() {
   }, [dateFilter, difficultyFilter, customFilter, history])
 
   const loadHistoryData = () => {
-    // localStorage에서 히스토리 데이터 불러오기
-    const historyData = getLocalStorageItem<HistoryItem[]>("dogfit-history", [])
+    const profileId = getLocalStorageItem("dogfit-selected-profile-id", null);
+    console.log("[히스토리] 선택된 프로필 ID:", profileId);
+    if (!profileId) {
+      console.log("[히스토리] 프로필 ID가 없습니다. 기록을 불러오지 않습니다.");
+      return;
+    }
     
-    // 날짜 기준 내림차순 정렬 (최신순)
+    // 프로필 ID 기반으로 히스토리 키 생성
+    const historyKey = `dogfit-history-${profileId}`;
+    const historyData = getLocalStorageItem<HistoryItem[]>(historyKey, []);
+    console.log("[히스토리] localStorage에서 불러온 히스토리 데이터:", historyData);
+
     const sortedHistory = [...historyData].sort((a, b) => 
       new Date(b.date).getTime() - new Date(a.date).getTime()
-    )
+    );
+    console.log("[히스토리] 정렬된 히스토리 데이터:", sortedHistory);
     
-    setHistory(sortedHistory)
-    setFilteredHistory(sortedHistory)
-    
-    // 로딩 시뮬레이션
-    setTimeout(() => {
-      setLoading(false)
-    }, 1000)
-  }
+    setHistory(sortedHistory);
+    setFilteredHistory(sortedHistory);
+    setLoading(false);
+  };
   
   // 히스토리 필터링 함수
   const filterHistory = () => {
     let filtered = [...history]
-    
+    console.log("[히스토리] 필터 전 전체 데이터:", filtered);
+
     // 날짜 필터 적용
     if (dateFilter !== "all") {
       const now = new Date()
@@ -102,34 +108,35 @@ export default function HistoryPage() {
         const itemDate = new Date(item.date)
         
         if (dateFilter === "today") {
-          // 오늘 날짜만 필터링
           return itemDate >= today
         } else if (dateFilter === "week") {
-          // 이번 주 필터링 (지난 7일)
           const weekAgo = new Date(now)
           weekAgo.setDate(now.getDate() - 7)
           return itemDate >= weekAgo
         } else if (dateFilter === "month") {
-          // 이번 달 필터링 (지난 30일)
           const monthAgo = new Date(now)
           monthAgo.setDate(now.getDate() - 30)
           return itemDate >= monthAgo
         }
         return true
       })
+      console.log(`[히스토리] 날짜 필터(${dateFilter}) 적용 후:`, filtered);
     }
     
     // 난이도 필터 적용
     if (difficultyFilter !== "all") {
       filtered = filtered.filter(item => item.difficulty === difficultyFilter)
+      console.log(`[히스토리] 난이도 필터(${difficultyFilter}) 적용 후:`, filtered);
     }
     
     // 커스텀 필터 적용
     if (customFilter === "custom") {
       filtered = filtered.filter(item => item.isCustom)
+      console.log("[히스토리] 커스텀 운동만 필터 적용 후:", filtered);
     }
     
     setFilteredHistory(filtered)
+    console.log("[히스토리] 최종 필터링 결과:", filtered);
   }
 
   // 날짜 포맷팅 함수 (YYYY-MM-DD 형식, 한국 시간)
@@ -155,53 +162,57 @@ export default function HistoryPage() {
 
   // 운동 기록 초기화 함수
   const clearHistory = () => {
-    // localStorage에서 'dogfit-history' 키 삭제
-    setLocalStorageItem("dogfit-history", [])
+    const profileId = getLocalStorageItem("dogfit-selected-profile-id", null);
+    if (!profileId) return;
+    const historyKey = `dogfit-history-${profileId}`;
+    setLocalStorageItem(historyKey, []);
     
     // UI 업데이트
-    setHistory([])
-    setFilteredHistory([])
+    setHistory([]);
+    setFilteredHistory([]);
     
     // 다이얼로그 닫기
-    setIsDialogOpen(false)
+    setIsDialogOpen(false);
     
     // 토스트 메시지 표시
     toast({
       title: "운동 기록이 초기화되었습니다!",
       description: "모든 운동 기록이 삭제되었습니다.",
       variant: "default",
-    })
+    });
   }
   
   // 개별 운동 기록 삭제 함수
   const deleteHistoryItem = (item: HistoryItem) => {
+    const profileId = getLocalStorageItem("dogfit-selected-profile-id", null);
+    if (!profileId) return;
+    const historyKey = `dogfit-history-${profileId}`;
     // 현재 히스토리 데이터 가져오기
-    const currentHistory = getLocalStorageItem<HistoryItem[]>("dogfit-history", [])
+    const currentHistory = getLocalStorageItem<HistoryItem[]>(historyKey, []);
     
     // 선택한 항목 제외한 새 배열 생성
-    // date와 id를 함께 비교하여 정확히 같은 항목만 제거
     const updatedHistory = currentHistory.filter(
       historyItem => !(historyItem.id === item.id && historyItem.date === item.date)
-    )
+    );
     
     // localStorage 업데이트
-    setLocalStorageItem("dogfit-history", updatedHistory)
+    setLocalStorageItem(historyKey, updatedHistory);
     
     // UI 업데이트
     setHistory(updatedHistory.sort((a, b) => 
       new Date(b.date).getTime() - new Date(a.date).getTime()
-    ))
+    ));
     
     // 다이얼로그 닫기
-    setIsItemDialogOpen(false)
-    setSelectedItem(null)
+    setIsItemDialogOpen(false);
+    setSelectedItem(null);
     
     // 토스트 메시지 표시
     toast({
       title: "운동 기록이 삭제되었습니다",
       description: `"${item.name}" 운동 기록이 삭제되었습니다.`,
       variant: "default",
-    })
+    });
   }
   
   // 삭제 다이얼로그 열기
