@@ -28,6 +28,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { CustomDropdown, DropdownItem } from "@/components/ui/dropdown"
+import type { DogProfile } from "@/lib/types"
 
 // 히스토리 항목 타입 정의
 interface HistoryItem {
@@ -49,6 +51,9 @@ type CustomFilter = "all" | "custom"
 
 export default function HistoryPage() {
   const router = useRouter()
+  const [profiles, setProfiles] = useState<DogProfile[]>([])
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null)
+  const [selectedProfile, setSelectedProfile] = useState<DogProfile | null>(null)
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [filteredHistory, setFilteredHistory] = useState<HistoryItem[]>([])
   const [loading, setLoading] = useState(true)

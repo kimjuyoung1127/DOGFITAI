@@ -417,7 +417,9 @@ export default function ResultPage() {
                     <li key={idx}>
                       {typeof stepObj === "string"
                         ? stepObj
-                        : `${stepObj.step}${stepObj.stepDuration ? ` (${stepObj.stepDuration}초)` : ""}`}
+                        : stepObj.description
+                          ? `${stepObj.description}${stepObj.stepDuration ? ` (${stepObj.stepDuration}초)` : ""}`
+                          : `${stepObj.step}${stepObj.stepDuration ? ` (${stepObj.stepDuration}초)` : ""}`}
                     </li>
                   ))}
                 </ol>

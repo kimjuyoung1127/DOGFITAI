@@ -17,7 +17,11 @@ export interface Exercise {
   difficulty: "easy" | "medium" | "hard"
   duration: number
   equipment: string[]
-  steps: { step: string; stepDuration: number }[] // ← 수정
+  steps: {
+    step: string;
+    description?: string;
+    stepDuration: number;
+  }[]
   benefits: string[]
   imageUrl?: string
   warmupSteps?: string[] // 추가: 준비운동 단계

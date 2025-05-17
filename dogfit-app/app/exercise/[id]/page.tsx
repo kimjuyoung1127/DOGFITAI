@@ -190,14 +190,23 @@ export default function ExercisePage({ params }: { params: { id: string } }) {
               <div>
                 <h3 className="font-bold mb-2">운동 단계</h3>
                 <div className="space-y-2">
-                  {Array.isArray(exercise.steps) && exercise.steps.map((step, index) => (
-                    <div key={index} className="bg-secondary p-3 rounded-lg text-sm">
-                      <span className="font-bold mr-2">{index + 1}.</span>
-                      {typeof step === "string"
-                        ? step
-                        : `${step.step}${step.stepDuration ? ` (${step.stepDuration}초)` : ""}`}
-                    </div>
-                  ))}
+                  {Array.isArray(exercise.steps) && exercise.steps.map((step, index) => {
+                    // step이 string이면 객체로 변환, 아니면 그대로 사용
+                    let stepObj: { step?: string; description?: string; stepDuration?: number };
+                    if (typeof step === "string") {
+                      stepObj = { step, stepDuration: 60 };
+                    } else {
+                      stepObj = step;
+                    }
+                    return (
+                      <div key={index} className="bg-secondary p-3 rounded-lg text-sm">
+                        <span className="font-bold mr-2">{index + 1}.</span>
+                        {stepObj.description
+                          ? `${stepObj.description}${stepObj.stepDuration ? ` (${stepObj.stepDuration}초)` : ""}`
+                          : `${stepObj.step ?? ""}${stepObj.stepDuration ? ` (${stepObj.stepDuration}초)` : ""}`}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

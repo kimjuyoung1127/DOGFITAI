@@ -75,7 +75,7 @@ export default function ExercisePlayPage({ params }: { params: { id: string } })
       // Normalize mainSteps to always be { step, stepDuration }[]
       const mainSteps =
         Array.isArray(foundExercise.steps) && foundExercise.steps.length > 0 && typeof foundExercise.steps[0] === "string"
-          ? (foundExercise.steps as string[]).map((s) => ({ step: s, stepDuration: 60 }))
+          ? (foundExercise.steps as unknown as string[]).map((s) => ({ step: s, stepDuration: 60 }))
           : Array.isArray(foundExercise.steps)
             ? (foundExercise.steps as { step: string; stepDuration: number }[])
             : [];
@@ -263,7 +263,13 @@ export default function ExercisePlayPage({ params }: { params: { id: string } })
                     </h3>
                   </div>
                   <p className="text-lg">
-                    {allDisplaySteps[currentStep]?.step}
+                    {
+                      allDisplaySteps[currentStep]
+                        ? allDisplaySteps[currentStep].description
+                          ? `${allDisplaySteps[currentStep].description}${allDisplaySteps[currentStep].stepDuration ? ` (${allDisplaySteps[currentStep].stepDuration}초)` : ""}`
+                          : `${allDisplaySteps[currentStep].step ?? ""}${allDisplaySteps[currentStep].stepDuration ? ` (${allDisplaySteps[currentStep].stepDuration}초)` : ""}`
+                        : ""
+                    }
                   </p>
                 </motion.div>
               )}
