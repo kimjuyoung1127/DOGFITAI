@@ -62,7 +62,9 @@ export interface DogProfileData {
   id: number
   dogInfo: DogInfo
   healthValues: Record<string, number>
-  performanceValues: Record<string, number>
+  performanceValues: {
+    [key: string]: number
+  }
   selectedActivities: Record<string, boolean>
   intensities: Record<string, number>
   selectedEquipment: Record<string, boolean>

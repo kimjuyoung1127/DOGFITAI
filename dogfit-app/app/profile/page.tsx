@@ -401,7 +401,10 @@ export default function ProfilePage() {
       setIsDialogOpen(false)
     }
   }
-
+  const handleViewHistory = (profileId: number) => {
+    router.push(`/history?profileId=${profileId}`)
+  }
+  
   const handleEditProfile = (profileId: number) => {
     router.push(`/form?profileId=${profileId}`)
   }
@@ -545,6 +548,14 @@ export default function ProfilePage() {
                     </div>
                   </div>
                   
+                  {/* 분석보기 버튼 추가 */}
+                  <Button
+                    className="w-full bg-blue-100 text-blue-700 hover:bg-blue-200 flex items-center justify-center py-3 mb-2 rounded-lg shadow-sm font-medium"
+                    onClick={() => router.push(`/profile/${profile.id}`)}
+                  >
+                    <Clock size={18} className="mr-2" />
+                    분석보기
+                  </Button>
                   {/* 운동 추천받기 버튼 - 더 눈에 띄게 강조 */}
                   <Button 
                     className="w-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center py-5 mb-4 rounded-lg shadow-sm"
