@@ -13,9 +13,10 @@ import type { Breed, DogInfo, DogProfile } from "@/lib/types"
 import { getLocalStorageItem, setLocalStorageItem } from "@/lib/utils"
 import { StampWidget } from "@/components/ui/stamp-widget"
 import { dogBreedData } from "@/Data/DogBreedData"
-import { Minus, Plus, Activity, ChevronDown, ChevronUp, PlayIcon as Run, Zap, Mountain, Scale, Hand, Triangle, Circle, Disc, CircleDot, Square, RectangleVerticalIcon as Rectangle } from "lucide-react"
+import { Minus, Plus, Activity, ChevronDown, ChevronUp, PlayIcon as Run, Zap, Mountain, Scale, Hand, Triangle, Circle, Disc, CircleDot, Square, RectangleVerticalIcon as Rectangle, Info } from "lucide-react"; // Info 아이콘 추가
 import { BreedSelector } from "@/components/ui/Breed-selector"
 import { DropdownItem } from "@/components/ui/dropdown"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"; // Tooltip 컴포넌트 추가
 import { healthCategories } from "@/Data/Health"
 import { activityIcons, activityNames } from "@/Data/Activity"
 import { equipmentItems } from "@/Data/EquipmentItem"
@@ -84,14 +85,12 @@ export default function DogInfoForm() {
     holding: 0,
   })
 
-  const [selectedEquipment, setSelectedEquipment] = useState<Record<string, boolean>>({
-    cone_bar: false,
-    balance_cushion: false,
-    balance_disc: false,
-    donut_ball: false,
-    yoga_block: false,
-    platform_board: false,
-  })
+  const [selectedEquipment, setSelectedEquipment] = useState<Record<string, boolean>>(
+    equipmentItems.reduce((acc, item) => {
+      acc[item.key] = false;
+      return acc;
+    }, {} as Record<string, boolean>)
+  )
 
   // 운동기구 목록을 Supabase에서 불러오는 함수
   const [equipmentList, setEquipmentList] = useState(equipmentItems)
@@ -160,8 +159,8 @@ export default function DogInfoForm() {
 
   useEffect(() => {
     // Load profiles from localStorage
-    const storedProfiles = getLocalStorageItem<DogProfile[]>("dogfit-profiles", [])
-    setProfiles(storedProfiles)
+    // const storedProfiles = getLocalStorageItem<DogProfile[]>("dogfit-profiles", [])
+    // setProfiles(storedProfiles) // This line is removed as profiles will be set from Supabase data
 
     // 프로필 데이터 불러오기
     const loadProfileData = async () => {
@@ -170,7 +169,17 @@ export default function DogInfoForm() {
         
         if (error) {
           console.error("프로필 데이터 불러오기 실패:", error.message)
+          // Set profiles to an empty array in case of an error to avoid issues with map function
+          setProfiles([]);
           return
+        }
+        
+        // Update the profiles state with the fetched data from Supabase
+        if (data) {
+          setProfiles(data); // 프로필 목록 상태 업데이트
+        } else {
+          // If data is null or undefined, ensure profiles is an empty array
+          setProfiles([]); // 데이터가 없으면 빈 배열로 설정
         }
         
         if (data && data.length > 0) {
@@ -265,20 +274,67 @@ export default function DogInfoForm() {
   }, [])
 
   const handleProfileSelect = (profileId: number) => {
-    const profile = profiles.find(p => p.id === profileId)
+    const profile = profiles.find(p => p.id === profileId);
     if (profile) {
+      // DogInfo 상태 업데이트
       setDogInfo({
         name: profile.name,
-        age: profile.age / 12, // Convert months to years
+        age: profile.age / 12, // DogProfile의 age는 개월 단위
         breed: profile.breed,
         weight: profile.weight,
-        activityLevel: "medium",
-        healthIssues: [],
         gender: profile.sex,
-      })
-      setSelectedProfileId(profileId)
+        activityLevel: profile.activityLevel || "medium", // DogProfile 타입의 activityLevel 사용
+        healthIssues: profile.healthIssues || [], // DogProfile 타입의 healthIssues 사용
+      });
+
+      // HealthValues 상태 업데이트 (DogProfile의 healthIssues를 기반으로 생성)
+      const initialHealthState = healthCategories.reduce((acc, category) => {
+        acc[category.id] = 0;
+        return acc;
+      }, {} as Record<string, number>);
+      if (profile.healthIssues) {
+        profile.healthIssues.forEach(issue => {
+          if (issue in initialHealthState) {
+            initialHealthState[issue] = 1; // 기본값으로 1 설정 (또는 다른 적절한 값)
+          }
+        });
+      }
+      setHealthValues(initialHealthState);
+
+      // PerformanceValues 상태 업데이트 (DogProfile 타입의 performance 사용)
+      const initialPerformanceState = Object.keys(performanceFieldMapping).reduce((acc, key) => {
+        acc[key] = 0;
+        return acc;
+      }, {} as Record<string, number>);
+      setPerformanceValues(profile.performance || initialPerformanceState);
+
+      // SelectedActivities 상태 업데이트 (DogProfile 타입의 selectedActivities 사용)
+      const initialSelectedActivitiesState = Object.keys(activityNames).reduce((acc, key) => {
+        acc[key] = false;
+        return acc;
+      }, {} as Record<string, boolean>);
+      setSelectedActivities(profile.selectedActivities || initialSelectedActivitiesState);
+
+      // Intensities 상태 업데이트 (DogProfile 타입의 intensities 사용)
+      const initialIntensitiesState = Object.keys(activityNames).reduce((acc, key) => {
+        acc[key] = 0;
+        return acc;
+      }, {} as Record<string, number>);
+      setIntensities(profile.intensities || initialIntensitiesState);
+
+      // SelectedEquipment 상태 업데이트 (DogProfile 타입의 selectedEquipment 사용)
+      const initialSelectedEquipmentState = equipmentItems.reduce((acc, item) => {
+        acc[item.key] = false;
+        return acc;
+      }, {} as Record<string, boolean>);
+      setSelectedEquipment(profile.selectedEquipment || initialSelectedEquipmentState);
+
+      setSelectedProfileId(profileId);
+      // 필요에 따라 현재 단계를 변경하거나 다른 UI 상태를 업데이트할 수 있습니다.
+      // 예: setIsSaveProfileChecked(true);
+      // 예: setStep(5); // 폼의 마지막 단계로 이동 등
     }
-  }
+  };
 
   const handleSaveProfile = async () => {
     // Prevent duplicate saves
@@ -661,13 +717,14 @@ export default function DogInfoForm() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 20 }}
-        className="w-full max-w-md"
-      >
+    <TooltipProvider>
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 20 }}
+          className="w-full max-w-md"
+        >
         <Card>
           <CardHeader>
             <CardTitle>반려견 정보 입력 ({step}/5)</CardTitle>
@@ -735,9 +792,21 @@ export default function DogInfoForm() {
                     </button>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="age">나이</Label>
-                  <div className="flex items-center space-x-1.5">
+                <div>
+                  <Label htmlFor="age" className="text-sm font-medium text-gray-700 flex items-center">
+                    나이 (세)
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="ml-1 h-6 w-6 p-0">
+                          <Info className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>※ 예: 1.1 = 1세 1개월, 1.5 = 1세 5개월, 2.0 = 2세</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
+                  <div className="flex items-center gap-2 mt-1">
                     <Button
                       type="button"
                       variant="outline"
@@ -753,13 +822,12 @@ export default function DogInfoForm() {
                       id="age"
                       name="age"
                       type="number"
-                      placeholder="예: 1.5세 또는 6개월"
-                      value={dogInfo.age.toFixed(1) || ""}
+                      value={dogInfo.age.toFixed(1)}
                       onChange={handleInputChange}
-                      min="0.1"
+                      placeholder="예: 1.5"
+                      className="w-full text-center appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       step="0.1"
-                      required
-                      className="flex-1 text-center"
+                      min="0.1"
                     />
                     <Button
                       type="button"
@@ -1068,6 +1136,7 @@ export default function DogInfoForm() {
         </Card>
       </motion.div>
       <StampWidget />
-    </div>
+      </div>
+    </TooltipProvider>
   )
 }
