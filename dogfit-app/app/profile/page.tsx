@@ -410,7 +410,7 @@ export default function ProfilePage() {
   }
 
   const handleAddProfile = () => {
-    router.push('/form')
+    router.push('/form?action=new'); // '?action=new' 추가
   }
 
   const handleLogout = async () => {

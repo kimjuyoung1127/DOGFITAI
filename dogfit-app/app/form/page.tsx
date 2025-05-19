@@ -35,7 +35,8 @@ export default function DogInfoForm() {
   const router = useRouter()
   const [step, setStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
-  const [dogInfo, setDogInfo] = useState<DogInfo>({
+  // 초기 상태 정의
+  const initialDogInfo: DogInfo = {
     name: "",
     age: 0,
     breed: "",
@@ -43,13 +44,76 @@ export default function DogInfoForm() {
     activityLevel: "medium",
     healthIssues: [],
     gender: "",
-  })
+  };
+  const initialHealthValues: Record<string, number> = healthCategories.reduce((acc, category) => {
+    acc[category.id] = 0;
+    return acc;
+  }, {} as Record<string, number>);
+  const initialPerformanceValues: Record<string, number> = Object.keys(performanceFieldMapping).reduce((acc, key) => {
+    acc[key] = 0;
+    return acc;
+  }, {} as Record<string, number>);
+  const initialSelectedActivities: Record<string, boolean> = {
+    running: false,
+    jumping: false,
+    climbing: false,
+    balance: false,
+    holding: false,
+  };
+  const initialIntensities: Record<string, number> = {
+    running: 0,
+    jumping: 0,
+    climbing: 0,
+    balance: 0,
+    holding: 0,
+  };
+  const initialSelectedEquipment: Record<string, boolean> = equipmentItems.reduce((acc, item) => {
+    acc[item.key] = false;
+    return acc;
+  }, {} as Record<string, boolean>);
+
+  const [dogInfo, setDogInfo] = useState<DogInfo>(initialDogInfo)
 
   // State for profiles
   const [profiles, setProfiles] = useState<DogProfile[]>([])
   const [selectedProfileId, setSelectedProfileId] = useState<number | null>(null)
   const [isSaveProfileChecked, setIsSaveProfileChecked] = useState(false)
   const { toast } = useToast()
+
+  // --- 임시 저장: step2~step5 상태를 localStorage에 저장 및 복원 ---
+  // 프로필 id가 바뀔 때 step2~step5 상태 임시 저장
+  useEffect(() => {
+    if (selectedProfileId !== null) {
+      setLocalStorageItem("dogfit-form-temp", {
+        healthValues,
+        performanceValues,
+        selectedActivities,
+        intensities,
+        selectedEquipment,
+        step,
+      })
+    }
+  }, [selectedProfileId])
+
+  // 프로필 id가 바뀌거나 폼이 마운트될 때 임시 저장된 상태 복원
+  useEffect(() => {
+    const temp = getLocalStorageItem("dogfit-form-temp", null) as {
+      healthValues?: typeof healthValues,
+      performanceValues?: typeof performanceValues,
+      selectedActivities?: typeof selectedActivities,
+      intensities?: typeof intensities,
+      selectedEquipment?: typeof selectedEquipment,
+      step?: number
+    } | null
+    if (temp) {
+      if (temp.healthValues) setHealthValues(temp.healthValues)
+      if (temp.performanceValues) setPerformanceValues(temp.performanceValues)
+      if (temp.selectedActivities) setSelectedActivities(temp.selectedActivities)
+      if (temp.intensities) setIntensities(temp.intensities)
+      if (temp.selectedEquipment) setSelectedEquipment(temp.selectedEquipment)
+      if (temp.step) setStep(temp.step)
+    }
+  }, [selectedProfileId])
 
   // State for saving profile
   const [isSaving, setIsSaving] = useState(false)
@@ -273,68 +337,81 @@ export default function DogInfoForm() {
     fetchEquipments()
   }, [])
 
-  const handleProfileSelect = (profileId: number) => {
-    const profile = profiles.find(p => p.id === profileId);
-    if (profile) {
-      // DogInfo 상태 업데이트
-      setDogInfo({
-        name: profile.name,
-        age: profile.age / 12, // DogProfile의 age는 개월 단위
-        breed: profile.breed,
-        weight: profile.weight,
-        gender: profile.sex,
-        activityLevel: profile.activityLevel || "medium", // DogProfile 타입의 activityLevel 사용
-        healthIssues: profile.healthIssues || [], // DogProfile 타입의 healthIssues 사용
-      });
-
-      // HealthValues 상태 업데이트 (DogProfile의 healthIssues를 기반으로 생성)
-      const initialHealthState = healthCategories.reduce((acc, category) => {
-        acc[category.id] = 0;
-        return acc;
-      }, {} as Record<string, number>);
-      if (profile.healthIssues) {
-        profile.healthIssues.forEach(issue => {
-          if (issue in initialHealthState) {
-            initialHealthState[issue] = 1; // 기본값으로 1 설정 (또는 다른 적절한 값)
-          }
-        });
-      }
-      setHealthValues(initialHealthState);
-
-      // PerformanceValues 상태 업데이트 (DogProfile 타입의 performance 사용)
-      const initialPerformanceState = Object.keys(performanceFieldMapping).reduce((acc, key) => {
-        acc[key] = 0;
-        return acc;
-      }, {} as Record<string, number>);
-      setPerformanceValues(profile.performance || initialPerformanceState);
-
-      // SelectedActivities 상태 업데이트 (DogProfile 타입의 selectedActivities 사용)
-      const initialSelectedActivitiesState = Object.keys(activityNames).reduce((acc, key) => {
-        acc[key] = false;
-        return acc;
-      }, {} as Record<string, boolean>);
-      setSelectedActivities(profile.selectedActivities || initialSelectedActivitiesState);
-
-      // Intensities 상태 업데이트 (DogProfile 타입의 intensities 사용)
-      const initialIntensitiesState = Object.keys(activityNames).reduce((acc, key) => {
-        acc[key] = 0;
-        return acc;
-      }, {} as Record<string, number>);
-      setIntensities(profile.intensities || initialIntensitiesState);
-
-      // SelectedEquipment 상태 업데이트 (DogProfile 타입의 selectedEquipment 사용)
-      const initialSelectedEquipmentState = equipmentItems.reduce((acc, item) => {
-        acc[item.key] = false;
-        return acc;
-      }, {} as Record<string, boolean>);
-      setSelectedEquipment(profile.selectedEquipment || initialSelectedEquipmentState);
-
-      setSelectedProfileId(profileId);
-      // 필요에 따라 현재 단계를 변경하거나 다른 UI 상태를 업데이트할 수 있습니다.
-      // 예: setIsSaveProfileChecked(true);
-      // 예: setStep(5); // 폼의 마지막 단계로 이동 등
+  // 프로필 선택 시 쿼리 파라미터로 id를 반영
+  const handleProfileSelect = (profileId: string) => {
+    if (profileId === "__new__") {
+      setDogInfo(initialDogInfo);
+      setHealthValues(initialHealthValues);
+      setPerformanceValues(initialPerformanceValues);
+      setSelectedActivities(initialSelectedActivities);
+      setIntensities(initialIntensities);
+      setSelectedEquipment(initialSelectedEquipment);
+      setSelectedProfileId(null);
+      setStep(1);
+      // 새 프로필은 쿼리스트링 제거
+      router.replace("?");
+      return;
     }
+    // 쿼리 파라미터에 id 반영
+    router.replace(`?id=${profileId}`);
+    // 상태 업데이트는 useEffect에서 처리
   };
+
+  // 쿼리 파라미터 id가 바뀔 때마다 해당 프로필 자동 선택
+  useEffect(() => {
+    const id = searchParams.get("id");
+    if (!id) return;
+    const profile = profiles.find(p => p.id.toString() === id);
+    if (profile) {
+      setSelectedProfileId(profile.id);
+      setStep(1);
+    }
+  }, [searchParams, profiles]);
+
+  // 프로필 선택(전환) 시 Supabase에서 상세 데이터 fetch 및 상태 반영
+  useEffect(() => {
+    if (selectedProfileId) {
+      const fetchProfileDetail = async () => {
+        const { data, error } = await supabase
+          .from('dog_profile')
+          .select('*')
+          .eq('id', selectedProfileId)
+          .single();
+        if (data) {
+          // step1
+          setDogInfo({
+            name: data.name || "",
+            age: data.age ? data.age / 12 : 0,
+            breed: data.breed || "",
+            weight: data.weight || 0.1,
+            activityLevel: data.activityLevel || "medium",
+            healthIssues: data.health_values ? Object.keys(data.health_values).filter(k => data.health_values[k] > 0) : [],
+            gender: data.sex || "",
+          });
+          // step2
+          setHealthValues(data.health_values || initialHealthValues);
+          // step3
+          setPerformanceValues(data.performance_values || initialPerformanceValues);
+          // step4
+          setSelectedActivities(
+            data.preferences?.selected?.reduce((acc: Record<string, boolean>, key: string) => {
+              acc[key] = true;
+              return acc;
+            }, { ...initialSelectedActivities }) || initialSelectedActivities
+          );
+          setIntensities(data.preferences?.intensity || initialIntensities);
+          // step5
+          setSelectedEquipment(
+            (data.equipment_keys || []).reduce((acc: Record<string, boolean>, key: string) => {
+              acc[key] = true;
+              return acc;
+            }, { ...initialSelectedEquipment })
+          );
+        }
+      };
+      fetchProfileDetail();
+    }
+  }, [selectedProfileId]);
 
   const handleSaveProfile = async () => {
     // Prevent duplicate saves
@@ -385,6 +462,8 @@ export default function DogInfoForm() {
       })
     } finally {
       setIsSaving(false)
+      // 폼 저장/완료 시 임시 저장 데이터 삭제
+      localStorage.removeItem("dogfit-form-temp")
     }
   }
 
@@ -431,6 +510,8 @@ export default function DogInfoForm() {
 
   // 전체 프로필 저장 함수
   const saveFullProfile = async () => {
+    // 폼 저장/완료 시 임시 저장 데이터 삭제
+    localStorage.removeItem("dogfit-form-temp")
     // Check if user is authenticated
     if (isAuthenticated === false) {
       console.log("🔒 로그인되지 않은 상태 감지, 임시 저장 시작")
@@ -517,7 +598,7 @@ export default function DogInfoForm() {
       )
       
       // 최종 프로필 데이터 구성
-      const profileData = {
+      const profileData: any = {
         name: dogInfo.name,
         sex: dogInfo.gender,
         age: Math.round(dogInfo.age * 12), // 년 단위를 월 단위로 변환
@@ -530,6 +611,12 @@ export default function DogInfoForm() {
           intensity: intensities
         },
         equipment_keys: selectedEquipmentList
+      }
+
+      // ★★★ 수정 모드일 때 id 추가 ★★★
+      const profileId = searchParams.get("profileId")
+      if (profileId) {
+        profileData.id = Number(profileId)
       }
       
       // Supabase에 저장
@@ -732,11 +819,12 @@ export default function DogInfoForm() {
           <CardContent>
             {/* Profile Dropdown */}
             {step === 1 && (
-              <Select onValueChange={(value) => handleProfileSelect(parseInt(value))}>
+              <Select onValueChange={handleProfileSelect}>
                 <SelectTrigger>
                   <SelectValue placeholder="프로필 선택" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__new__">+ 새 프로필 추가</SelectItem>
                   {profiles.map(profile => (
                     <SelectItem key={profile.id} value={profile.id.toString()}>
                       {profile.name} ({profile.breed})
