@@ -14,6 +14,7 @@ import { StampWidget } from "@/components/ui/stamp-widget"
 import { Home, Twitter, Instagram, Clock } from "lucide-react"
 import Link from "next/link"
 import { generateExerciseRecommendations } from "@/lib/utils"
+import { addExerciseHistory, addExerciseHistoryToProfile } from "@/lib/supabase/updateHistory"
 
 export default function CompletePage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -28,6 +29,9 @@ export default function CompletePage({ params }: { params: { id: string } }) {
   const id = params.id;
 
   useEffect(() => {
+    // 어떤 id가 사용되는지 콘솔에 출력
+    console.log("[DogFit][CompletePage] params.id:", id);
+
     // Load exercises from localStorage
     const recommendations = getLocalStorageItem<Exercise[]>("dogfit-recommendations", [])
     const customExercises = getLocalStorageItem<CustomExercise[]>("dogfit-custom-exercises", [])
@@ -88,16 +92,17 @@ export default function CompletePage({ params }: { params: { id: string } }) {
   }, [id, router])
   
   // 운동 완료 데이터를 히스토리에 저장하는 함수
-  const saveExerciseToHistory = (exercise: Exercise, dogInfo: DogInfo | null) => {
+  const saveExerciseToHistory = async (exercise: Exercise, dogInfo: DogInfo | null) => {
     if (!exercise || !dogInfo) return;
 
     const profileId = getLocalStorageItem("dogfit-selected-profile-id", null);
+    console.log("[DogFit][CompletePage] profileId(localStorage):", profileId);
+
     if (!profileId) return;
 
-    const historyKey = `dogfit-history-${profileId}`;
     const historyEntry = {
-      id: exercise.id,
-      name: exercise.name,
+      profile_id: profileId, // exercise_history 테이블의 profile_id 컬럼
+      exercise_name: exercise.name,
       date: new Date().toISOString(),
       duration: exercise.duration,
       isCustom: exercise.isCustom || false,
@@ -107,25 +112,13 @@ export default function CompletePage({ params }: { params: { id: string } }) {
       benefits: exercise.benefits || []
     };
 
-    // 기존 히스토리 가져오기
-    const existingHistory = getLocalStorageItem(historyKey, []);
-
-    // 이미 동일한 id와 date(ISO string 앞 16자리까지, 즉 분 단위)가 있으면 저장하지 않음
-    const isAlreadySaved = existingHistory.some(
-      (item: any) =>
-        item.id === historyEntry.id &&
-        item.date?.slice(0, 16) === historyEntry.date.slice(0, 16)
-    );
-    if (isAlreadySaved) {
-      // 이미 저장된 경우 추가하지 않음
-      return;
+    // Supabase에 기록 추가
+    try {
+      // 반드시 exercise_history 테이블에 insert 하도록 구현
+      await addExerciseHistory(profileId, historyEntry)
+    } catch (e) {
+      console.error("🔥 [saveExerciseToHistory] 운동 기록 저장 실패:", e)
     }
-
-    // 새 항목 추가
-    const updatedHistory = [historyEntry, ...existingHistory];
-
-    // localStorage에 저장
-    setLocalStorageItem(historyKey, updatedHistory);
   };
 
   const handleShareTwitter = () => {

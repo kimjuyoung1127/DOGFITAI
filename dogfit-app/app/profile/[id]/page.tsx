@@ -70,7 +70,6 @@ export default function AnalysisPage() {
       if (error || !data) {
         setDogProfile(null)
         setPerformanceValues(null)
-        // 필요시 에러 처리
         return
       }
 
@@ -83,13 +82,12 @@ export default function AnalysisPage() {
         equipment: data.equipment_keys || [],
       })
       setPerformanceValues(data.performance_values || null)
-      // 필요시 추천/히스토리 등도 여기서 fetch
     }
 
-    // 분석 요약 자동 호출 (이제 /api/exercises를 사용)
+    // summary와 recommendations를 한 번에 받아서 상태/로컬스토리지에 저장
     const fetchSummaryAndRecommendations = async () => {
       try {
-        const res = await fetch("/api/exercises", { // API 엔드포인트 변경
+        const res = await fetch("/api/exercises", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ profileId }),
@@ -101,17 +99,20 @@ export default function AnalysisPage() {
         }
         const data = await res.json()
         setSummaryText(data.summary || "분석 요약을 불러오지 못했습니다.")
-        // 필요하다면 여기서 data.recommendations를 사용하여 운동 추천 목록 상태도 업데이트 할 수 있습니다.
-        // setExerciseRecommendations(data.recommendations || []); 
-        // 하지만 현재 페이지에서는 summary만 사용하므로, recommendations는 주석 처리합니다.
+        // 추천 운동을 상태와 로컬스토리지에 저장
+        if (data.recommendations) {
+          setExerciseRecommendations(data.recommendations)
+          localStorage.setItem("dogfit-recommendations", JSON.stringify(data.recommendations))
+        }
       } catch (e) {
         console.error("fetchSummaryAndRecommendations 에러:", e);
         setSummaryText("분석 요약을 불러오지 못했습니다.")
       }
     }
 
+    // 중복 호출 없이 한 번씩만 실행
     fetchProfile()
-    fetchSummaryAndRecommendations() // 이 함수가 호출되면서 API 요청이 발생합니다.
+    fetchSummaryAndRecommendations()
   }, [profileId])
 
   // 차트용 데이터 변환

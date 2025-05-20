@@ -215,6 +215,12 @@ export default function ProfilePage() {
       
       console.log("✅ Supabase 저장 성공:", data)
       
+      // 최신 프로필 id를 localStorage에 저장
+      if (data && data.id) {
+        setLocalStorageItem("dogfit-selected-profile-id", data.id)
+        console.log("✅ 최신 프로필 id를 localStorage에 저장:", data.id)
+      }
+      
       // Only remove from localStorage after successful save
       localStorage.removeItem('dogfit-pending-profile')
       localStorage.removeItem('dogfit-pending-processed') // 처리 완료 후 플래그도 제거
@@ -310,64 +316,8 @@ export default function ProfilePage() {
     }
   }
 
-  // Function to handle exercise recommendation
-  const handleExerciseRecommendation = async (profileId: number) => {
-    try {
-      // 로딩 상태 설정
-      setIsLoading(true);
-      
-      console.log(`🏋️ 프로필 ID ${profileId}에 대한 운동 추천 요청 시작...`);
-      
-      // API 호출
-      const response = await fetch('/api/exercises', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ profileId }),
-      });
-      
-      // 응답 처리
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || '알 수 없는 오류가 발생했습니다.');
-      }
-      
-      // 추천 운동 추출
-      const recommendations = data.recommendations || [];
-      
-      console.log(`✅ 추천 운동 ${recommendations.length}개 수신 완료:`, recommendations);
-      
-      // localStorage에 저장
-      setLocalStorageItem("dogfit-recommendations", recommendations);
-      console.log("✅ 추천 운동 저장됨", recommendations);
-      
-      // 프로필 ID도 저장 (result 페이지에서 필요할 수 있음)
-      setLocalStorageItem("dogfit-selected-profile-id", profileId);
-      
-      // 성공 토스트 메시지
-      toast({
-        title: "✅ 운동 추천 완료",
-        description: `${recommendations.length}개의 맞춤형 운동이 추천되었습니다.`,
-      });
-      
-      // 잠시 후 결과 페이지로 이동
-      setTimeout(() => {
-        router.push("/result");
-      }, 1000);
-      
-    } catch (error) {
-      console.error('❌ 운동 추천 요청 실패:', error);
-      toast({
-        title: "❌ 운동 추천 실패",
-        description: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.',
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+
+  
 
   const handleDeleteProfile = async (profileId: number) => {
     try {
@@ -551,18 +501,13 @@ export default function ProfilePage() {
                   {/* 분석보기 버튼 추가 */}
                   <Button
                     className="w-full bg-blue-100 text-blue-700 hover:bg-blue-200 flex items-center justify-center py-3 mb-2 rounded-lg shadow-sm font-medium"
-                    onClick={() => router.push(`/profile/${profile.id}`)}
+                    onClick={() => {
+                      setLocalStorageItem("dogfit-selected-profile-id", profile.id)
+                      router.push(`/profile/${profile.id}`)
+                    }}
                   >
                     <Clock size={18} className="mr-2" />
-                    분석보기
-                  </Button>
-                  {/* 운동 추천받기 버튼 - 더 눈에 띄게 강조 */}
-                  <Button 
-                    className="w-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center py-5 mb-4 rounded-lg shadow-sm"
-                    onClick={() => handleExerciseRecommendation(profile.id)}
-                  >
-                    <PawPrint size={20} className="mr-2" />
-                    <span className="font-medium">운동 추천받기</span>
+                    {profile.name ? `${profile.name} 운동 분석 시작` : "운동 분석 시작"}
                   </Button>
 
                   <Button
@@ -570,7 +515,9 @@ export default function ProfilePage() {
                     onClick={() => router.push('/history')}
                   >
                     <Clock className="mr-2" size={20} />
-                    <span className="font-medium">운동 기록 보러가기</span>
+                    <span className="font-medium">
+                      {profile.name ? `${profile.name}의 운동일지` : "운동 기록 보러가기"}
+                    </span>
                   </Button>
                   
                   

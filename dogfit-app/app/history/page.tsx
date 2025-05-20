@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { PawPrintLoading } from "@/components/ui/paw-print-loading"
 import { motion } from "framer-motion"
-import { getLocalStorageItem, setLocalStorageItem } from "@/lib/utils"
+import { getLocalStorageItem } from "@/lib/utils"
 import { StampWidget } from "@/components/ui/stamp-widget"
 import Link from "next/link"
 import { ArrowLeft, Clock, Trash2, Filter, X } from "lucide-react"
@@ -30,207 +30,172 @@ import {
 } from "@/components/ui/select"
 import { CustomDropdown, DropdownItem } from "@/components/ui/dropdown"
 import type { DogProfile } from "@/lib/types"
+import { supabase } from "@/lib/supabase/supabaseClient"
 
-// 히스토리 항목 타입 정의
-interface HistoryItem {
+// exercise_history 테이블 타입 정의
+interface ExerciseHistoryItem {
   id: string
-  name: string
+  profile_id: string
+  exercise_name: string
   date: string
-  duration: number
-  isCustom: boolean
-  difficulty: "easy" | "medium" | "hard"
-  dogName: string
-  equipmentUsed: string[]
-  benefits: string[]
+  sets: number
+  repetitions: number
+  steps: any // jsonb
+  feedback: string | null // text or jsonb
+  created_at: string
+  updated_at: string
+  // 확장: 아래 필드는 UI 편의상 추가
+  difficulty?: "easy" | "medium" | "hard"
+  duration?: number
+  equipmentUsed?: string[]
+  benefits?: string[]
 }
 
-// 필터 타입 정의
 type DateFilter = "all" | "today" | "week" | "month"
 type DifficultyFilter = "all" | "easy" | "medium" | "hard"
-type CustomFilter = "all" | "custom"
 
 export default function HistoryPage() {
   const router = useRouter()
   const [profiles, setProfiles] = useState<DogProfile[]>([])
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null)
-  const [selectedProfile, setSelectedProfile] = useState<DogProfile | null>(null)
-  const [history, setHistory] = useState<HistoryItem[]>([])
-  const [filteredHistory, setFilteredHistory] = useState<HistoryItem[]>([])
+  const [history, setHistory] = useState<ExerciseHistoryItem[]>([])
+  const [filteredHistory, setFilteredHistory] = useState<ExerciseHistoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false)
-  const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null)
+  const [selectedItem, setSelectedItem] = useState<ExerciseHistoryItem | null>(null)
   const { toast } = useToast()
-  
+
   // 필터 상태
   const [dateFilter, setDateFilter] = useState<DateFilter>("all")
   const [difficultyFilter, setDifficultyFilter] = useState<DifficultyFilter>("all")
-  const [customFilter, setCustomFilter] = useState<CustomFilter>("all")
 
+  // 프로필 및 기록 불러오기
   useEffect(() => {
-    loadHistoryData()
-  }, [])
-  
-  // 필터 변경 시 히스토리 필터링
-  useEffect(() => {
-    filterHistory()
-  }, [dateFilter, difficultyFilter, customFilter, history])
-
-  const loadHistoryData = () => {
-    const profileId = getLocalStorageItem("dogfit-selected-profile-id", null);
-    console.log("[히스토리] 선택된 프로필 ID:", profileId);
-    if (!profileId) {
-      console.log("[히스토리] 프로필 ID가 없습니다. 기록을 불러오지 않습니다.");
-      return;
+    const fetchProfileAndHistory = async () => {
+      setLoading(true)
+      // 프로필 ID는 localStorage에서 선택된 값 사용
+      const profileId = getLocalStorageItem("dogfit-selected-profile-id", null)
+      setSelectedProfileId(profileId)
+      if (!profileId) {
+        setLoading(false)
+        return
+      }
+      // Supabase에서 운동 기록 조회
+      const { data, error } = await supabase
+        .from("exercise_history")
+        .select("*")
+        .eq("profile_id", profileId)
+        .order("date", { ascending: false })
+      if (error) {
+        setHistory([])
+        setFilteredHistory([])
+        setLoading(false)
+        return
+      }
+      setHistory(data || [])
+      setFilteredHistory(data || [])
+      setLoading(false)
     }
-    
-    // 프로필 ID 기반으로 히스토리 키 생성
-    const historyKey = `dogfit-history-${profileId}`;
-    const historyData = getLocalStorageItem<HistoryItem[]>(historyKey, []);
-    console.log("[히스토리] localStorage에서 불러온 히스토리 데이터:", historyData);
+    fetchProfileAndHistory()
+  }, [])
 
-    const sortedHistory = [...historyData].sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-    console.log("[히스토리] 정렬된 히스토리 데이터:", sortedHistory);
-    
-    setHistory(sortedHistory);
-    setFilteredHistory(sortedHistory);
-    setLoading(false);
-  };
-  
-  // 히스토리 필터링 함수
-  const filterHistory = () => {
+  // 필터 적용
+  useEffect(() => {
     let filtered = [...history]
-    console.log("[히스토리] 필터 전 전체 데이터:", filtered);
-
-    // 날짜 필터 적용
+    // 날짜 필터
     if (dateFilter !== "all") {
       const now = new Date()
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      
       filtered = filtered.filter(item => {
         const itemDate = new Date(item.date)
-        
         if (dateFilter === "today") {
-          return itemDate >= today
-        } else if (dateFilter === "week") {
+          return (
+            itemDate.getFullYear() === now.getFullYear() &&
+            itemDate.getMonth() === now.getMonth() &&
+            itemDate.getDate() === now.getDate()
+          )
+        }
+        if (dateFilter === "week") {
           const weekAgo = new Date(now)
           weekAgo.setDate(now.getDate() - 7)
-          return itemDate >= weekAgo
-        } else if (dateFilter === "month") {
-          const monthAgo = new Date(now)
-          monthAgo.setDate(now.getDate() - 30)
-          return itemDate >= monthAgo
+          return itemDate >= weekAgo && itemDate <= now
+        }
+        if (dateFilter === "month") {
+          return (
+            itemDate.getFullYear() === now.getFullYear() &&
+            itemDate.getMonth() === now.getMonth()
+          )
         }
         return true
       })
-      console.log(`[히스토리] 날짜 필터(${dateFilter}) 적용 후:`, filtered);
     }
-    
-    // 난이도 필터 적용
+    // 난이도 필터 (steps jsonb에 difficulty가 있을 경우)
     if (difficultyFilter !== "all") {
-      filtered = filtered.filter(item => item.difficulty === difficultyFilter)
-      console.log(`[히스토리] 난이도 필터(${difficultyFilter}) 적용 후:`, filtered);
+      filtered = filtered.filter(item => {
+        if (item.steps && typeof item.steps === "object" && item.steps.difficulty) {
+          return item.steps.difficulty === difficultyFilter
+        }
+        if (item.difficulty) {
+          return item.difficulty === difficultyFilter
+        }
+        return false
+      })
     }
-    
-    // 커스텀 필터 적용
-    if (customFilter === "custom") {
-      filtered = filtered.filter(item => item.isCustom)
-      console.log("[히스토리] 커스텀 운동만 필터 적용 후:", filtered);
-    }
-    
     setFilteredHistory(filtered)
-    console.log("[히스토리] 최종 필터링 결과:", filtered);
-  }
+  }, [dateFilter, difficultyFilter, history])
 
-  // 날짜 포맷팅 함수 (YYYY-MM-DD 형식, 한국 시간)
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    const kstDate = new Date(date.getTime() + (9 * 60 * 60 * 1000)) // KST = UTC+9
-    return kstDate.toISOString().split('T')[0]
-  }
-
-  // 난이도에 따른 배지 스타일 결정
-  const getDifficultyBadge = (difficulty: "easy" | "medium" | "hard") => {
-    switch (difficulty) {
-      case "easy":
-        return <Badge variant="outline">쉬움</Badge>
-      case "medium":
-        return <Badge variant="secondary">중간</Badge>
-      case "hard":
-        return <Badge>어려움</Badge>
-      default:
-        return <Badge variant="outline">쉬움</Badge>
-    }
-  }
-
-  // 운동 기록 초기화 함수
-  const clearHistory = () => {
-    const profileId = getLocalStorageItem("dogfit-selected-profile-id", null);
-    if (!profileId) return;
-    const historyKey = `dogfit-history-${profileId}`;
-    setLocalStorageItem(historyKey, []);
-    
-    // UI 업데이트
-    setHistory([]);
-    setFilteredHistory([]);
-    
-    // 다이얼로그 닫기
-    setIsDialogOpen(false);
-    
-    // 토스트 메시지 표시
+  // 기록 초기화 (전체 삭제)
+  const handleClearHistory = async () => {
+    if (!selectedProfileId) return
+    await supabase
+      .from("exercise_history")
+      .delete()
+      .eq("profile_id", selectedProfileId)
+    setHistory([])
+    setFilteredHistory([])
+    setIsDialogOpen(false)
     toast({
       title: "운동 기록이 초기화되었습니다!",
       description: "모든 운동 기록이 삭제되었습니다.",
       variant: "default",
-    });
-  }
-  
-  // 개별 운동 기록 삭제 함수
-  const deleteHistoryItem = (item: HistoryItem) => {
-    const profileId = getLocalStorageItem("dogfit-selected-profile-id", null);
-    if (!profileId) return;
-    const historyKey = `dogfit-history-${profileId}`;
-    // 현재 히스토리 데이터 가져오기
-    const currentHistory = getLocalStorageItem<HistoryItem[]>(historyKey, []);
-    
-    // 선택한 항목 제외한 새 배열 생성
-    const updatedHistory = currentHistory.filter(
-      historyItem => !(historyItem.id === item.id && historyItem.date === item.date)
-    );
-    
-    // localStorage 업데이트
-    setLocalStorageItem(historyKey, updatedHistory);
-    
-    // UI 업데이트
-    setHistory(updatedHistory.sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    ));
-    
-    // 다이얼로그 닫기
-    setIsItemDialogOpen(false);
-    setSelectedItem(null);
-    
-    // 토스트 메시지 표시
-    toast({
-      title: "운동 기록이 삭제되었습니다",
-      description: `"${item.name}" 운동 기록이 삭제되었습니다.`,
-      variant: "default",
-    });
-  }
-  
-  // 삭제 다이얼로그 열기
-  const openDeleteDialog = (e: React.MouseEvent, item: HistoryItem) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setSelectedItem(item)
-    setIsItemDialogOpen(true)
+    })
   }
 
+  // 개별 기록 삭제
+  const handleDeleteHistoryItem = async (item: ExerciseHistoryItem) => {
+    if (!selectedProfileId) return
+    await supabase
+      .from("exercise_history")
+      .delete()
+      .eq("profile_id", selectedProfileId)
+      .eq("id", item.id)
+      .eq("date", item.date)
+    setHistory((prev) => prev.filter(
+      historyItem => !(historyItem.id === item.id && historyItem.date === item.date)
+    ))
+    setFilteredHistory((prev) => prev.filter(
+      historyItem => !(historyItem.id === item.id && historyItem.date === item.date)
+    ))
+    setIsItemDialogOpen(false)
+    setSelectedItem(null)
+    toast({
+      title: "운동 기록이 삭제되었습니다",
+      description: `"${item.exercise_name}" 운동 기록이 삭제되었습니다.`,
+      variant: "default",
+    })
+  }
+
+  // 날짜 포맷팅 (YYYY-MM-DD)
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    const kstDate = new Date(date.getTime() + (9 * 60 * 60 * 1000))
+    return kstDate.toISOString().split('T')[0]
+  }
+
+  // 로딩 화면
   if (loading) {
     return (
-      <div className="container flex items-center justify-center min-h-screen p-4" style={{ backgroundColor: "#FFF6EE" }}>
+      <div className="container flex items-center justify-center min-h-screen p-4">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6 flex flex-col items-center justify-center min-h-[300px]">
             <h2 className="text-xl font-bold mb-6">운동 기록을 불러오고 있어요</h2>
@@ -242,217 +207,163 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className="container flex flex-col items-center min-h-screen p-4" style={{ backgroundColor: "#FFF6EE" }}>
-      <div className="w-full max-w-md">
-        <div className="flex items-center mb-6">
-          <Link href="/">
-            <Button variant="ghost" size="icon" className="mr-2">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <h1 className="text-2xl font-bold text-center flex-1 mr-9">나의 운동기록</h1>
-        </div>
-        <div className="mb-4">
-          <Link href="/profile">
-            <Button
-              className="w-full bg-orange-400 hover:bg-orange-500 text-white flex items-center justify-center py-4 rounded-lg shadow-sm"
-            >
-              <ArrowLeft className="mr-2" size={18} />
-              <span className="font-medium">프로필로 돌아가기</span>
-            </Button>
-          </Link>
-        </div>
-        
-        {history.length > 0 && (
-          <div className="mb-6 p-4 bg-white rounded-lg shadow-sm">
-            <div className="flex items-center mb-3">
-              <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-              <h3 className="text-sm font-medium">필터</h3>
-            </div>
-            
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <Select value={dateFilter} onValueChange={(value) => setDateFilter(value as DateFilter)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="날짜" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">전체 기간</SelectItem>
-                    <SelectItem value="today">오늘</SelectItem>
-                    <SelectItem value="week">이번 주</SelectItem>
-                    <SelectItem value="month">이번 달</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Select value={difficultyFilter} onValueChange={(value) => setDifficultyFilter(value as DifficultyFilter)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="난이도" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">모든 난이도</SelectItem>
-                    <SelectItem value="easy">쉬움</SelectItem>
-                    <SelectItem value="medium">중간</SelectItem>
-                    <SelectItem value="hard">어려움</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Select value={customFilter} onValueChange={(value) => setCustomFilter(value as CustomFilter)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="커스텀" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">전체 운동</SelectItem>
-                    <SelectItem value="custom">커스텀 운동만</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {history.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <Card className="w-full">
-              <CardContent className="pt-6 flex flex-col items-center justify-center min-h-[200px]">
-                <h2 className="text-xl font-bold mb-6">아직 완료한 운동이 없어요!</h2>
-                <Link href="/result">
-                  <Button>추천 운동으로 돌아가기</Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ) : filteredHistory.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <Card className="w-full">
-              <CardContent className="pt-6 flex flex-col items-center justify-center min-h-[200px]">
-                <h2 className="text-xl font-bold mb-6">해당 조건의 운동기록이 없어요!</h2>
-                <Button onClick={() => {
-                  setDateFilter("all");
-                  setDifficultyFilter("all");
-                  setCustomFilter("all");
-                }}>
-                  필터 초기화하기
-                </Button>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ) : (
-          <>
-            <div className="space-y-4">
-              {filteredHistory.map((item, index) => (
-                <motion.div
-                  key={`${item.id}-${index}`}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                >
-                  <Link href={`/exercise/${item.id}?from=history`}>
-                    <Card className="w-full cursor-pointer hover:shadow-md transition-shadow relative">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="absolute top-2 right-2 h-7 w-7 bg-transparent text-muted-foreground hover:bg-gray-100 z-10"
-                        onClick={(e) => openDeleteDialog(e, item)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <h3 className="text-lg font-bold">{item.name}</h3>
-                            <p className="text-sm text-muted-foreground">{formatDate(item.date)}</p>
-                          </div>
-                          <div className="flex items-center mr-8">
-                            <Clock className="h-4 w-4 mr-1 text-muted-foreground" />
-                            <span className="text-sm text-muted-foreground">{item.duration}분</span>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          {getDifficultyBadge(item.difficulty)}
-                          {item.isCustom && <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">커스텀 운동</Badge>}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                </motion.div>
-              ))}
-            </div>
-            
-            <div className="mt-8 w-full">
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    className="w-full border-red-300 text-red-500 hover:bg-red-50 hover:text-red-600 flex items-center gap-2"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    운동 기록 초기화
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>운동 기록 초기화</DialogTitle>
-                    <DialogDescription>
-                      정말 모든 운동 기록을 삭제하시겠어요? 이 작업은 되돌릴 수 없습니다.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <DialogFooter className="mt-4">
-                    <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                      취소
-                    </Button>
-                    <Button variant="destructive" onClick={clearHistory}>
-                      삭제하기
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </>
-        )}
+    <div className="container flex flex-col items-center justify-center min-h-screen p-4">
+      <div className="w-full max-w-md mb-4 flex items-center justify-between">
+        <Link href="/profile">
+          <Button variant="ghost" className="flex items-center gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            프로필로 돌아가기
+          </Button>
+        </Link>
+        <Button variant="outline" onClick={() => setIsDialogOpen(true)}>
+          <Trash2 className="h-4 w-4 mr-1" />
+          전체 기록 삭제
+        </Button>
       </div>
-      
-      {/* 개별 항목 삭제 다이얼로그 */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-md"
+      >
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle>운동 기록</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2 mb-4">
+              <Select value={dateFilter} onValueChange={(value) => setDateFilter(value as DateFilter)}>
+                <SelectTrigger className="w-24">
+                  <SelectValue placeholder="날짜" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  <SelectItem value="today">오늘</SelectItem>
+                  <SelectItem value="week">1주일</SelectItem>
+                  <SelectItem value="month">이번 달</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={difficultyFilter} onValueChange={(value) => setDifficultyFilter(value as DifficultyFilter)}>
+                <SelectTrigger className="w-24">
+                  <SelectValue placeholder="난이도" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  <SelectItem value="easy">쉬움</SelectItem>
+                  <SelectItem value="medium">중간</SelectItem>
+                  <SelectItem value="hard">어려움</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {filteredHistory.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                기록이 없습니다.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredHistory.map((item, idx) => (
+                  <Card key={item.id + item.date + idx} className="border p-2">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="font-bold text-lg">{item.exercise_name}</div>
+                        <div className="text-xs text-muted-foreground">{formatDate(item.date)}</div>
+                        <div className="flex gap-2 mt-1">
+                          <Badge variant="outline">{item.sets}세트</Badge>
+                          <Badge variant="outline">{item.repetitions}회</Badge>
+                          {item.steps?.difficulty && (
+                            <Badge variant={
+                              item.steps.difficulty === "easy"
+                                ? "outline"
+                                : item.steps.difficulty === "medium"
+                                  ? "secondary"
+                                  : "default"
+                            }>
+                              {item.steps.difficulty === "easy" ? "쉬움" : item.steps.difficulty === "medium" ? "중간" : "어려움"}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            setSelectedItem(item)
+                            setIsItemDialogOpen(true)
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    {/* 단계/피드백 등 상세 정보 */}
+                    <div className="mt-2 text-sm">
+                      {Array.isArray(item.steps)
+                        ? item.steps.map((step: any, i: number) => (
+                            <div key={i}>
+                              <span className="font-semibold">{step.step || step.description}</span>
+                              {step.stepDuration && (
+                                <span className="ml-2 text-xs text-muted-foreground">
+                                  ({step.stepDuration}초)
+                                </span>
+                              )}
+                            </div>
+                          ))
+                        : null}
+                      {item.feedback && (
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          피드백: {typeof item.feedback === "string" ? item.feedback : JSON.stringify(item.feedback)}
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+      <StampWidget />
+
+      {/* 전체 삭제 다이얼로그 */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>전체 기록 삭제</DialogTitle>
+            <DialogDescription>모든 운동 기록을 삭제하시겠습니까?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              취소
+            </Button>
+            <Button variant="destructive" onClick={handleClearHistory}>
+              삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* 개별 삭제 다이얼로그 */}
       <Dialog open={isItemDialogOpen} onOpenChange={setIsItemDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>운동 기록 삭제</DialogTitle>
             <DialogDescription>
-              이 운동 기록을 삭제하시겠어요?
-              {selectedItem && (
-                <div className="mt-2 p-3 bg-gray-50 rounded-md">
-                  <p className="font-medium">{selectedItem.name}</p>
-                  <p className="text-sm text-muted-foreground">{formatDate(selectedItem.date)}</p>
-                </div>
-              )}
+              선택한 운동 기록을 삭제하시겠습니까?
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="mt-4">
+          <DialogFooter>
             <Button variant="outline" onClick={() => setIsItemDialogOpen(false)}>
               취소
             </Button>
-            <Button 
-              variant="destructive" 
-              onClick={() => selectedItem && deleteHistoryItem(selectedItem)}
+            <Button
+              variant="destructive"
+              onClick={() => selectedItem && handleDeleteHistoryItem(selectedItem)}
             >
-              삭제하기
+              삭제
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
-      <StampWidget />
     </div>
   )
 }

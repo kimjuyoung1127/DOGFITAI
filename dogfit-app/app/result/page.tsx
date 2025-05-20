@@ -129,78 +129,92 @@ export default function ResultPage() {
   const [customBenefit, setCustomBenefit] = useState("")
 
   useEffect(() => {
-    // 로딩 상태 설정
     setLoading(true);
+    // 1. localStorage에서 profileId 가져오기 (가장 중요)
+    const storedProfileId = getLocalStorageItem<string | null>("dogfit-selected-profile-id", null);
+    console.log("📥 [DogFit][ResultPage] localStorage에서 가져온 profileId:", storedProfileId);
 
-    // 1. localStorage에서 추천 운동 데이터 가져오기
-    const savedRecommendations = getLocalStorageItem<Exercise[]>("dogfit-recommendations", []);
-    console.log("📥 localStorage에서 불러온 운동:", savedRecommendations);
-
-    // 2. 강아지 정보 가져오기
+    // 2. 강아지 정보 가져오기 (profileId와 직접적 연관은 없지만, 추천 생성에 필요)
     const savedDogInfo = getLocalStorageItem<DogInfo | null>("dogfit-dog-info", null);
     setDogInfo(savedDogInfo);
 
-    // steps 변환 함수
+    // 3. 추천 운동 데이터 가져오기 (profileId 기반으로 저장되었을 수 있음)
+    const savedRecommendations = getLocalStorageItem<Exercise[]>("dogfit-recommendations", []);
+    console.log("📥 localStorage에서 불러온 기존 운동 추천:", savedRecommendations);
+
     const normalizeSteps = (steps: any) => {
       if (!steps) return [];
-      if (Array.isArray(steps) && typeof steps[0] === "string") {
+      // steps가 문자열 배열이고, 첫 번째 요소가 문자열인지 확인
+      if (Array.isArray(steps) && steps.length > 0 && typeof steps[0] === "string") {
         return steps.map((s: string) => ({ step: s, stepDuration: 60 }));
       }
+      // 이미 객체 배열이거나 빈 배열이면 그대로 반환
       return steps;
     };
 
-    if (savedRecommendations && savedRecommendations.length > 0) {
-      // API에서 받은 추천 운동이 있는 경우
-      console.log("✅ API 추천 운동 사용:", savedRecommendations.length, "개");
+    // profileId가 있는지 확인
+    if (!storedProfileId) {
+      console.error("❌ profileId가 localStorage에 없습니다. 프로필 선택 페이지로 이동합니다.");
+      // 사용자를 프로필 선택 페이지로 리디렉션합니다.
+      router.push("/profile");
+      return; // useEffect 실행 중단
+    }
 
-      // isCustom 속성 추가 및 steps 변환
+    // API 호출 또는 기존 추천 사용 로직
+    // 이 부분은 profileId를 사용하여 API를 호출하거나,
+    // profileId에 해당하는 추천을 localStorage에서 찾아 사용해야 합니다.
+    // 현재 코드는 dogfit-recommendations 키로 저장된 것을 그대로 사용하고 있습니다.
+    // 이 저장된 추천이 올바른 profileId에 대한 것인지 확인하는 로직이 필요할 수 있습니다.
+    // (예: 추천 데이터 내에 profileId를 포함하여 저장하고, 불러올 때 비교)
+
+    if (savedRecommendations && savedRecommendations.length > 0) {
+      console.log("✅ 기존 저장된 운동 추천 사용:", savedRecommendations.length, "개");
+
       const typedRecommendations = savedRecommendations.map(rec => ({
         ...rec,
-        isCustom: false,
+        isCustom: false, // API에서 받은 추천은 isCustom: false
         steps: normalizeSteps(rec.steps),
       }));
 
-      // 커스텀 운동 가져오기 및 steps 변환
       const customExercises = getLocalStorageItem<CustomExercise[]>("dogfit-custom-exercises", []).map(rec => ({
         ...rec,
-        steps: normalizeSteps(rec.steps),
+        steps: normalizeSteps(rec.steps), // 커스텀 운동도 steps 정규화
       }));
 
-      // 모든 운동 합치기
       setExercises([...typedRecommendations, ...customExercises]);
     } else if (savedDogInfo) {
-      // API 추천이 없지만 강아지 정보가 있는 경우 fallback으로 목업 데이터 생성
-      console.log("⚠️ API 추천 없음, 목업 데이터 사용");
+      // API 추천이 없고, 강아지 정보가 있는 경우:
+      // 클라이언트 사이드에서 운동을 생성하거나, API를 호출하여 받아와야 합니다.
+      // 현재는 generateExerciseRecommendations (클라이언트 사이드 생성)을 사용합니다.
+      // API를 사용한다면, storedProfileId를 API 요청에 포함해야 합니다.
+      // 예: fetch(`/api/exercises`, { method: 'POST', body: JSON.stringify({ profileId: storedProfileId }) })
+      console.log("⚠️ 저장된 추천 없음, savedDogInfo 기반으로 클라이언트에서 생성 (실제로는 API 호출 권장)");
       const recommendations = generateExerciseRecommendations(savedDogInfo);
 
-      // isCustom 속성 추가 및 steps 변환
       const typedRecommendations = recommendations.map(rec => ({
         ...rec,
         isCustom: false,
         steps: normalizeSteps(rec.steps),
       }));
 
-      // 커스텀 운동 가져오기 및 steps 변환
       const customExercises = getLocalStorageItem<CustomExercise[]>("dogfit-custom-exercises", []).map(rec => ({
         ...rec,
         steps: normalizeSteps(rec.steps),
       }));
-
-      // 모든 운동 합치기
+      
       setExercises([...typedRecommendations, ...customExercises]);
+      // 생성된 추천을 localStorage에 저장할 수 있습니다 (선택 사항).
+      // API를 사용한다면 API 응답을 저장합니다.
+      // setLocalStorageItem("dogfit-recommendations", typedRecommendations); // 필요시 주석 해제
     } else {
-      // 강아지 정보도 없는 경우 프로필 페이지로 리다이렉트
+      // 강아지 정보도 없는 경우 (이론적으로 storedProfileId가 있으면 dogInfo도 있어야 함)
       console.error("❌ 강아지 정보 없음, 프로필 페이지로 이동");
       router.push("/profile");
-      return;
+      return; // useEffect 실행 중단
     }
 
-    // 로딩 시뮬레이션 (UX 향상)
-    setTimeout(() => {
-      setLoading(false);
-    }, 1000);
-  }, [router])
-
+    setLoading(false);
+  }, [router]); // router를 의존성 배열에 추가합니다.
   const handlePrevious = () => {
     setCurrentIndex((prev) => (prev === 0 ? exercises.length - 1 : prev - 1))
   }
