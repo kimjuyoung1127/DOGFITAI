@@ -1,7 +1,7 @@
 "use client"
 
 import React from 'react'
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react" // useRef import 추가
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,6 +24,9 @@ export default function CompletePage({ params }: { params: { id: string } }) {
   const [stamps, setStamps] = useState(0)
   const [showConfetti, setShowConfetti] = useState(false)
   
+  // 이전에 저장된 운동 ID를 추적하기 위한 ref
+  const lastSavedExerciseIdRef = useRef<string | null>(null);
+
   // params를 React.use()로 unwrap하고 id 가져오기  
   // 기존 방식으로 돌아가기
   const id = params.id;
@@ -65,8 +68,11 @@ export default function CompletePage({ params }: { params: { id: string } }) {
 
     if (foundExercise) {
       setExercise(foundExercise)
-      // 운동 완료 데이터를 히스토리에 저장 (한 번만 호출)
-      saveExerciseToHistory(foundExercise, savedDogInfo)
+      // 운동 완료 데이터를 히스토리에 저장 (현재 ID에 대해 아직 저장되지 않은 경우에만)
+      if (savedDogInfo && lastSavedExerciseIdRef.current !== id) {
+        saveExerciseToHistory(foundExercise, savedDogInfo);
+        lastSavedExerciseIdRef.current = id; // 현재 ID에 대해 저장되었음을 표시
+      }
     } else {
       // 운동을 찾지 못한 경우
       if (savedDogInfo) {
@@ -89,7 +95,7 @@ export default function CompletePage({ params }: { params: { id: string } }) {
     setTimeout(() => {
       setLoading(false)
     }, 1000)
-  }, [id, router])
+  }, [id, router]) // 의존성 배열은 그대로 유지
   
   // 운동 완료 데이터를 히스토리에 저장하는 함수
   const saveExerciseToHistory = async (exercise: Exercise, dogInfo: DogInfo | null) => {
