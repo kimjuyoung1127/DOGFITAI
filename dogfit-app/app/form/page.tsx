@@ -29,7 +29,7 @@ import { getDogProfile } from "@/lib/supabase/getDogProfile"
 import { upsertDogProfile } from "@/lib/supabase/upsertDogProfile"
 import { supabase } from "@/lib/supabase/supabaseClient"
 
-
+const stepNames = ["기본 정보", "건강 상태", "운동 능력", "활동 선호도", "운동기구"];
 
 export default function DogInfoForm() {
   const router = useRouter()
@@ -674,6 +674,10 @@ export default function DogInfoForm() {
     saveFullProfile()
   }
 
+  const handleStepClick = (targetStep: number) => {
+    setStep(targetStep);
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     if (name === 'breed') return;
@@ -816,6 +820,22 @@ export default function DogInfoForm() {
           <CardHeader>
             <CardTitle>반려견 정보 입력 ({step}/5)</CardTitle>
           </CardHeader>
+          
+          {/* === 새로운 단계 네비게이션 UI 시작 === */}
+          <div className="flex justify-center gap-2 mb-4 px-6 flex-wrap"> {/* px-6은 CardContent의 패딩과 유사하게 맞춤, flex-wrap 추가 */}
+            {stepNames.map((name, index) => (
+              <Button
+                key={index}
+                variant={step === index + 1 ? "default" : "outline"}
+                onClick={() => handleStepClick(index + 1)}
+                size="sm" // 작은 크기 버튼
+              >
+                {name}
+              </Button>
+            ))}
+          </div>
+          {/* === 새로운 단계 네비게이션 UI 끝 === */}
+
           <CardContent>
             {/* Profile Dropdown */}
             {step === 1 && (
