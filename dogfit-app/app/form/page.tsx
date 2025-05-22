@@ -76,7 +76,7 @@ export default function DogInfoForm() {
 
   // State for profiles
   const [profiles, setProfiles] = useState<DogProfile[]>([])
-  const [selectedProfileId, setSelectedProfileId] = useState<number | null>(null)
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null)
   const [isSaveProfileChecked, setIsSaveProfileChecked] = useState(false)
   const { toast } = useToast()
 
@@ -349,11 +349,11 @@ export default function DogInfoForm() {
       setSelectedProfileId(null);
       setStep(1);
       // 새 프로필은 쿼리스트링 제거
-      router.replace("?");
+      router.replace("/form");
       return;
     }
     // 쿼리 파라미터에 id 반영
-    router.replace(`?id=${profileId}`);
+    router.replace(`/form?id=${profileId}`);
     // 상태 업데이트는 useEffect에서 처리
   };
 
@@ -361,7 +361,7 @@ export default function DogInfoForm() {
   useEffect(() => {
     const id = searchParams.get("id");
     if (!id) return;
-    const profile = profiles.find(p => p.id.toString() === id);
+    const profile = profiles.find(p => p.id === id);
     if (profile) {
       setSelectedProfileId(profile.id);
       setStep(1);
@@ -419,7 +419,7 @@ export default function DogInfoForm() {
     
     setIsSaving(true)
     
-    const profileData = {
+    const profileDataToSave: any = {
       name: dogInfo.name,
       sex: dogInfo.gender,
       age: Math.round(dogInfo.age * 12), // Convert to months
@@ -431,11 +431,11 @@ export default function DogInfoForm() {
         selected: Object.keys(selectedActivities).filter(activity => selectedActivities[activity]),
         intensity: intensities
       },
-      equipment: Object.keys(selectedEquipment).filter(key => selectedEquipment[key])
+      equipment_keys: Object.keys(selectedEquipment).filter(key => selectedEquipment[key])
     }
 
     try {
-      const { data, error } = await upsertDogProfile(profileData)
+      const { data: savedProfile, error } = await upsertDogProfile(profileDataToSave)
 
       if (error) {
         console.error("프로필 저장 실패:", error.message)
@@ -445,13 +445,22 @@ export default function DogInfoForm() {
           variant: "destructive",
         })
       } else {
-        console.log("프로필 저장 성공:", data)
+        console.log("프로필 저장 성공:", savedProfile)
         toast({
           title: "✅ 프로필이 저장되었습니다!",
           description: "반려견 정보가 성공적으로 저장되었습니다.",
           variant: "default",
         })
         setIsSaved(true)
+        // 저장 후 /result 페이지로 리디렉션
+        // savedProfile이 배열일 수 있으니 첫 번째 요소에서 id 추출
+const profileId = Array.isArray(savedProfile)
+  ? (savedProfile[0] as { id: string })?.id
+  : (savedProfile && typeof savedProfile === "object" && "id" in savedProfile)
+    ? (savedProfile as { id: string }).id
+    : undefined;
+        router.push(`/result?profileId=${profileId || ''}`)
+        return true
       }
     } catch (e) {
       console.error("프로필 저장 중 오류 발생:", e)
@@ -570,7 +579,7 @@ export default function DogInfoForm() {
         console.log("➡️ 로그인 페이지로 이동")
         
         // Redirect to login page with a flag to indicate pending data
-        router.push('/login?pending_data=true&redirect=/profile')
+        setTimeout(() => { router.push(`/login?redirect=/form&pending_data=true`); }, 100);
         return
       } catch (e) {
         console.error("❌ 임시 저장 중 오류 발생:", e)
@@ -598,7 +607,7 @@ export default function DogInfoForm() {
       )
       
       // 최종 프로필 데이터 구성
-      const profileData: any = {
+      const profileDataToSave: any = {
         name: dogInfo.name,
         sex: dogInfo.gender,
         age: Math.round(dogInfo.age * 12), // 년 단위를 월 단위로 변환
@@ -614,13 +623,16 @@ export default function DogInfoForm() {
       }
 
       // ★★★ 수정 모드일 때 id 추가 ★★★
-      const profileId = searchParams.get("profileId")
+      const profileId = searchParams.get("profileId");
       if (profileId) {
-        profileData.id = Number(profileId)
+        profileDataToSave.id = profileId;
+      }
+      if (profileId) {
+        profileDataToSave.id = Number(profileId)
       }
       
       // Supabase에 저장
-      const { data, error } = await upsertDogProfile(profileData)
+      const { data: savedProfile, error } = await upsertDogProfile(profileDataToSave)
       
       if (error) {
         console.error("프로필 저장 실패:", error.message)
@@ -642,7 +654,7 @@ export default function DogInfoForm() {
           selected: selectedActivitiesList, 
           intensity: intensities 
         },
-        equipment: selectedEquipmentList
+        equipment_keys: selectedEquipmentList
       })
       
       toast({
@@ -652,7 +664,7 @@ export default function DogInfoForm() {
       })
       
       // 저장 후 /profile 페이지로 리디렉션
-      router.push("/profile")
+      router.push(`/result?profileId=${selectedProfileId || ''}`)
       return true
     } catch (e) {
       console.error("❌ Supabase 저장 중 오류 발생:", e)

@@ -37,7 +37,7 @@ export interface CustomExercise extends Exercise {
 }
 
 export interface DogProfile {
-  id: number
+  id: string // 변경: number -> string
   name: string
   age: number
   weight: number
@@ -59,7 +59,7 @@ export interface DogProfile {
 
 export interface DogProfileData {
   
-  id: number
+  id: string // 변경: number -> string
   dogInfo: DogInfo
   healthValues: Record<string, number>
   performanceValues: {

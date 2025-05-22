@@ -143,7 +143,7 @@ export default function ProfilePage() {
         Object.keys(selectedEquipment).filter(key => selectedEquipment[key]) : []
       
       const profileData: {
-        id?: number;
+        id?: string; // 변경: number -> string
         name: string;
         sex: string;
         age: number;
@@ -196,11 +196,11 @@ export default function ProfilePage() {
       // If profile with same name exists, update it instead of creating new one
       if (existingProfiles && existingProfiles.length > 0) {
         console.log("🔄 동일한 이름의 프로필이 존재합니다. 업데이트를 진행합니다:", existingProfiles[0])
-        profileData.id = existingProfiles[0].id
+        profileData.id = existingProfiles[0].id // existingProfiles[0].id는 이미 string (UUID)
       }
       
       // Save to Supabase
-      const { data, error } = await upsertDogProfile(profileData as any)
+      const { data, error } = await upsertDogProfile(profileData as any) // profileData.id는 string | undefined
       
       if (error) {
         console.error("❌ 임시 데이터 저장 실패:", error)
@@ -319,7 +319,7 @@ export default function ProfilePage() {
 
   
 
-  const handleDeleteProfile = async (profileId: number) => {
+  const handleDeleteProfile = async (profileId: string) => { // 변경: number -> string
     try {
       const { error } = await supabase
         .from('dog_profile')
@@ -351,12 +351,12 @@ export default function ProfilePage() {
       setIsDialogOpen(false)
     }
   }
-  const handleViewHistory = (profileId: number) => {
+  const handleViewHistory = (profileId: string) => { // 변경: number -> string
     router.push(`/history?profileId=${profileId}`)
   }
   
-  const handleEditProfile = (profileId: number) => {
-    router.push(`/form?profileId=${profileId}`)
+  const handleEditProfile = (profileId: string) => { // 변경: number -> string
+    router.push(`/form?id=${profileId}`) // 변경: /form?profileId= -> /form?id= (form 페이지와 일관성)
   }
 
   const handleAddProfile = () => {
