@@ -12,12 +12,17 @@ import { supabase } from "@/lib/supabase/supabaseClient"
 
 
 type PerformanceValues = {
-    strength: number
-    balance: number
-    flexibility: number
-    stamina: number
+    endurance: number
+    mobility: number
+    reaction: number
+    focus: number
     agility: number
-    [key: string]: number
+    balance: number
+    confidence: number
+    bodyAwareness: number
+    problemSolving: number
+    speed: number
+    [key: string]: number // Keep for flexibility
   }
   
   type Recommendation = {
@@ -68,6 +73,7 @@ export default function AnalysisPage() {
         .single()
 
       if (error || !data) {
+        console.error("Error fetching dog profile:", error)
         setDogProfile(null)
         setPerformanceValues(null)
         return
@@ -82,6 +88,8 @@ export default function AnalysisPage() {
         equipment: data.equipment_keys || [],
       })
       setPerformanceValues(data.performance_values || null)
+      // Return the breed to be used by fetchBreedAverageData
+      return data.breed 
     }
 
     // summary와 recommendations를 한 번에 받아서 상태/로컬스토리지에 저장
@@ -111,8 +119,82 @@ export default function AnalysisPage() {
     }
 
     // 중복 호출 없이 한 번씩만 실행
-    fetchProfile()
+    fetchProfile().then(breed => {
+      if (breed) {
+        fetchBreedAverageData(breed)
+      }
+    })
     fetchSummaryAndRecommendations()
+    fetchExerciseHistory()
+
+    const fetchExerciseHistory = async () => {
+      if (!profileId) return
+      try {
+        const { data, error } = await supabase
+          .from('exercise_history')
+          .select('date, performance_values, completed')
+          .eq('profile_id', profileId)
+          .order('date', { ascending: true })
+
+        if (error) {
+          console.error("Error fetching exercise history:", error)
+          setExerciseHistory([])
+          return
+        }
+        if (data) {
+          const historyItems: HistoryItem[] = data.map(item => ({
+            date: item.date,
+            values: item.performance_values as PerformanceValues, // Assuming performance_values is already correct type
+            completed: item.completed,
+          }))
+          setExerciseHistory(historyItems)
+        } else {
+          setExerciseHistory([])
+        }
+      } catch (e) {
+        console.error("Error in fetchExerciseHistory:", e)
+        setExerciseHistory([])
+      }
+    }
+
+    const fetchBreedAverageData = async (breedName: string) => {
+      try {
+        const { data, error } = await supabase
+          .from("breed_average_performance")
+          .select("*")
+          .eq("breed", breedName)
+          .single()
+
+        if (error) {
+          console.error("Error fetching breed average performance data for breed:", breedName, error)
+          setBreedAvgValues(null)
+          return
+        }
+
+        if (data) {
+          const breedPerformance: PerformanceValues = {
+            endurance: data.endurance ?? 0,
+            mobility: data.mobility ?? 0,
+            reaction: data.reaction ?? 0,
+            focus: data.focus ?? 0,
+            agility: data.agility ?? 0,
+            balance: data.balance ?? 0,
+            confidence: data.confidence ?? 0,
+            bodyAwareness: data.bodyAwareness ?? 0,
+            problemSolving: data.problemSolving ?? 0,
+            speed: data.speed ?? 0,
+            // Ensure all keys from the new PerformanceValues are present
+          }
+          setBreedAvgValues(breedPerformance)
+        } else {
+          console.log("No breed average data found for:", breedName)
+          setBreedAvgValues(null)
+        }
+      } catch (e) {
+        console.error("Error in fetchBreedAverageData for breed:", breedName, e)
+        setBreedAvgValues(null)
+      }
+    }
   }, [profileId])
 
   // 차트용 데이터 변환
@@ -121,10 +203,12 @@ export default function AnalysisPage() {
         ...basicPerformanceCategories.map(cat => ({
           subject: cat.title,
           value: performanceValues[cat.id] ?? 0,
+          avg: breedAvgValues ? breedAvgValues[cat.id] ?? 0 : 0,
         })),
         ...advancedPerformanceCategories.map(cat => ({
           subject: cat.title,
           value: performanceValues[cat.id] ?? 0,
+          avg: breedAvgValues ? breedAvgValues[cat.id] ?? 0 : 0,
         })),
       ]
     : []
@@ -132,8 +216,11 @@ export default function AnalysisPage() {
   const barData = radarData
 
   const historyChartData = exerciseHistory.map((item) => ({
-    date: item.date.slice(5, 10),
-    ...item.values,
+    date: new Date(item.date).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }),
+    endurance: item.values.endurance ?? 0, // Changed from stamina
+    agility: item.values.agility ?? 0,
+    speed: item.values.speed ?? 0,
+    // Add other specific values you want to track, ensuring they exist in PerformanceValues
   }))
 
   // 액션 핸들러
@@ -181,6 +268,7 @@ export default function AnalysisPage() {
                   <Radar name="견종 평균" dataKey="avg" stroke="#60a5fa" fill="#93c5fd" fillOpacity={0.3} />
                 )}
                 <Legend />
+                <Tooltip /> {/* Added Tooltip for RadarChart */}
               </RadarChart>
             </ResponsiveContainer>
           </div>
@@ -222,8 +310,32 @@ export default function AnalysisPage() {
         </CardContent>
       </Card>
 
+      {/* 5. 능력치 변화 추이 (LineChart) 카드 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>능력치 변화 추이</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {historyChartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={historyChartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis domain={[0, 5]} />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="endurance" name="체력" stroke="#8884d8" />
+                <Line type="monotone" dataKey="agility" name="민첩성" stroke="#82ca9d" />
+                <Line type="monotone" dataKey="speed" name="속도" stroke="#ffc658" />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div>운동 기록이 없어 추이를 표시할 수 없습니다.</div>
+          )}
+        </CardContent>
+      </Card>
 
-      {/* 5. 액션 버튼 */}
+      {/* 6. 액션 버튼 */}
       <div className="flex flex-col gap-2 mt-2">
         <Button className="bg-blue-500 text-white" onClick={handleRetryRecommendation}>
           운동 추천 다시 받기
