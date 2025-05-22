@@ -434,6 +434,11 @@ export default function DogInfoForm() {
       equipment_keys: Object.keys(selectedEquipment).filter(key => selectedEquipment[key])
     }
 
+    // 기존 프로필 수정 시 id 포함(덮어쓰기)
+    if (selectedProfileId) {
+      profileDataToSave.id = selectedProfileId;
+    }
+
     try {
       const { data: savedProfile, error } = await upsertDogProfile(profileDataToSave)
 
@@ -452,14 +457,8 @@ export default function DogInfoForm() {
           variant: "default",
         })
         setIsSaved(true)
-        // 저장 후 /result 페이지로 리디렉션
-        // savedProfile이 배열일 수 있으니 첫 번째 요소에서 id 추출
-const profileId = Array.isArray(savedProfile)
-  ? (savedProfile[0] as { id: string })?.id
-  : (savedProfile && typeof savedProfile === "object" && "id" in savedProfile)
-    ? (savedProfile as { id: string }).id
-    : undefined;
-        router.push(`/result?profileId=${profileId || ''}`)
+        // 저장 후 /profile 페이지로 리디렉션
+        router.push("/profile")
         return true
       }
     } catch (e) {
@@ -623,12 +622,8 @@ const profileId = Array.isArray(savedProfile)
       }
 
       // ★★★ 수정 모드일 때 id 추가 ★★★
-      const profileId = searchParams.get("profileId");
-      if (profileId) {
-        profileDataToSave.id = profileId;
-      }
-      if (profileId) {
-        profileDataToSave.id = Number(profileId)
+      if (selectedProfileId) {
+        profileDataToSave.id = selectedProfileId;
       }
       
       // Supabase에 저장
@@ -664,7 +659,7 @@ const profileId = Array.isArray(savedProfile)
       })
       
       // 저장 후 /profile 페이지로 리디렉션
-      router.push(`/result?profileId=${selectedProfileId || ''}`)
+      router.push("/profile")
       return true
     } catch (e) {
       console.error("❌ Supabase 저장 중 오류 발생:", e)
