@@ -1,8 +1,9 @@
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+import { supabase } from './supabase/supabaseClient';
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 export function getLocalStorageItem<T>(key: string, defaultValue: T): T {
@@ -27,13 +28,109 @@ export function setLocalStorageItem<T>(key: string, value: T): void {
   } catch (error) {
     console.error(`Error setting localStorage item ${key}:`, error)
   }
+
 }
 
-export function addStamp(): number {
-  const currentStamps = getLocalStorageItem<number>("dogfit-stamps", 0)
-  const newStamps = currentStamps + 1
-  setLocalStorageItem("dogfit-stamps", newStamps)
-  return newStamps
+export interface AddStampResult {
+  newTotalStamps: number;
+  awardedBadgeName: string | null;
+}
+
+export async function addStamp(): Promise<AddStampResult> {
+  const profile_id = getLocalStorageItem<string | null>("dogfit-selected-profile-id", null);
+
+  if (!profile_id) {
+    console.error("Error: No profile_id found in localStorage.");
+    throw new Error("사용자 프로필 ID를 찾을 수 없어 스탬프를 추가할 수 없습니다.");
+  }
+
+  let currentTotalStamps = 0;
+  try {
+    const { data: latestStamp, error: fetchError } = await supabase
+      .from('stamps')
+      .select('total_stamp_count')
+      .eq('profile_id', profile_id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') { 
+      console.error('Error fetching stamps:', fetchError);
+      // In case of error fetching, return current known state or error state
+      return { newTotalStamps: 0, awardedBadgeName: null };
+    }
+    if (latestStamp) {
+      currentTotalStamps = latestStamp.total_stamp_count;
+    }
+  } catch (error) {
+    console.error('Exception when fetching stamps:', error);
+    return { newTotalStamps: 0, awardedBadgeName: null };
+  }
+
+  const newTotalStamps = currentTotalStamps + 1;
+  let awardedBadgeName = null;
+  let awardedBadgeAchievedAt = null;
+  let stampCountForRecord = 1; // Default for a single stamp event
+
+  // Check for badges (iterate from highest to lowest to award the best one)
+  const badgeCriteria = [
+    { name: "gold", requiredStamps: 20 },
+    { name: "silver", requiredStamps: 10 },
+    { name: "bronze", requiredStamps: 5 },
+  ];
+
+  for (const badge of badgeCriteria) {
+    if (newTotalStamps >= badge.requiredStamps) {
+      const { data: existingBadge, error: badgeCheckError } = await supabase
+        .from('stamps')
+        .select('id')
+        .eq('profile_id', profile_id)
+        .eq('badge_type', badge.name)
+        .limit(1)
+        .single();
+
+      if (badgeCheckError && badgeCheckError.code !== 'PGRST116') { // PGRST116: no rows found
+        console.error(`Error checking for ${badge.name} badge:`, badgeCheckError);
+        // Potentially skip awarding this badge due to check error, or handle differently
+        continue; 
+      }
+
+      if (!existingBadge) {
+        awardedBadgeName = badge.name;
+        awardedBadgeAchievedAt = new Date().toISOString();
+        stampCountForRecord = newTotalStamps; // For a badge record, stamp_count is the threshold
+        break; // Award only the highest new badge
+      }
+    }
+  }
+
+  // Insert the new record
+  try {
+    const { error: insertError } = await supabase
+      .from('stamps')
+      .insert({
+        profile_id: profile_id,
+        total_stamp_count: newTotalStamps,
+        stamp_count: stampCountForRecord, 
+        created_at: new Date().toISOString(), 
+        badge_type: awardedBadgeName,
+        achieved_at: awardedBadgeAchievedAt 
+      });
+
+    if (insertError) {
+      console.error('Error inserting stamp:', insertError);
+      throw new Error("스탬프 정보를 데이터베이스에 저장하는데 실패했습니다.");
+    }
+  } catch (error) {
+    console.error('Exception when inserting stamp:', error);
+    // If the error is one we threw intentionally, rethrow it. Otherwise, wrap it.
+    if (error instanceof Error && (error.message === "사용자 프로필 ID를 찾을 수 없어 스탬프를 추가할 수 없습니다." || error.message === "스탬프 정보를 데이터베이스에 저장하는데 실패했습니다.")) {
+      throw error;
+    }
+    throw new Error("스탬프 처리 중 예기치 않은 오류가 발생했습니다: " + (error instanceof Error ? error.message : String(error)));
+  }
+
+  return { newTotalStamps: newTotalStamps, awardedBadgeName: awardedBadgeName };
 }
 
 export function shareToSNS(platform: "twitter" | "instagram", message: string): void {

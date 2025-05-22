@@ -23,6 +23,8 @@ export default function CompletePage({ params }: { params: { id: string } }) {
   const [loading, setLoading] = useState(true)
   const [stamps, setStamps] = useState(0)
   const [showConfetti, setShowConfetti] = useState(false)
+  const [newlyAwardedBadge, setNewlyAwardedBadge] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null); // Added error state
   
   // 이전에 저장된 운동 ID를 추적하기 위한 ref
   const lastSavedExerciseIdRef = useRef<string | null>(null);
@@ -83,19 +85,37 @@ export default function CompletePage({ params }: { params: { id: string } }) {
     }
 
     // Add stamp
-    const newStampCount = addStamp()
-    setStamps(newStampCount)
+    const handleAddStamp = async () => {
+      try {
+        const { newTotalStamps, awardedBadgeName } = await addStamp();
+        setErrorMessage(null); // Clear any previous error
+        setStamps(newTotalStamps);
+        setNewlyAwardedBadge(awardedBadgeName);
+        setShowConfetti(true); // Show confetti on success
+      } catch (error) {
+        console.error("스탬프 처리 중 오류 발생:", error);
+        if (error instanceof Error) {
+          setErrorMessage(error.message);
+        } else {
+          setErrorMessage("스탬프를 처리하는 중 알 수 없는 오류가 발생했습니다.");
+        }
+        // Attempt to set stamps from localStorage as a fallback, or to 0.
+        // This part assumes getLocalStorageItem is synchronous and safe to call here.
+        const fallbackStamps = getLocalStorageItem<number>("dogfit-stamps", 0); // Using a generic key for example
+        setStamps(fallbackStamps); 
+        setNewlyAwardedBadge(null);
+        setShowConfetti(false); // Ensure confetti isn't shown on error
+      }
+    };
+    handleAddStamp();
 
-    // Show confetti after a short delay
-    setTimeout(() => {
-      setShowConfetti(true)
-    }, 500)
-
-    // Simulate loading
+    // Simulate loading - this should ideally be linked to actual data loading,
+    // including the addStamp process. For now, keeping it separate.
+    // Consider setting loading to false at the end of handleAddStamp's try/catch.
     setTimeout(() => {
       setLoading(false)
-    }, 1000)
-  }, [id, router]) // 의존성 배열은 그대로 유지
+    }, 1000) // This timeout might need adjustment based on addStamp's execution time
+  }, [id, router])
   
   // 운동 완료 데이터를 히스토리에 저장하는 함수
   const saveExerciseToHistory = async (exercise: Exercise, dogInfo: DogInfo | null) => {
@@ -193,9 +213,18 @@ export default function CompletePage({ params }: { params: { id: string } }) {
       >
         <Card className="w-full">
           <CardHeader className="bg-primary text-white">
-            <CardTitle className="text-center">운동 완료!</CardTitle>
+            <CardTitle className="text-center">{errorMessage ? "오류 발생" : "운동 완료!"}</CardTitle>
           </CardHeader>
           <CardContent className="p-6 space-y-6">
+            {errorMessage && (
+              <motion.div 
+                className="mt-4 p-3 rounded-lg text-center bg-destructive text-destructive-foreground"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                <p>{errorMessage}</p>
+              </motion.div>
+            )}
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
@@ -207,17 +236,21 @@ export default function CompletePage({ params }: { params: { id: string } }) {
                   <img src="/placeholder.svg?height=100&width=100" alt="Stamp" className="h-20 w-20" />
                 </motion.div>
               </div>
-              <h2 className="text-2xl font-bold text-center">스탬프 획득!</h2>
-              <p className="text-center text-muted-foreground mt-2">총 {stamps}개의 스탬프를 모았어요!</p>
-              {stamps >= 5 && (
+              {!errorMessage && !loading && (
+                <>
+                  <h2 className="text-2xl font-bold text-center">스탬프 획득!</h2>
+                  <p className="text-center text-muted-foreground mt-2">총 {stamps}개의 스탬프를 모았어요!</p>
+                </>
+              )}
+              {newlyAwardedBadge && !errorMessage && !loading && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 1 }}
+                  transition={{ delay: 1 }} 
                   className="mt-4 bg-primary/10 p-3 rounded-lg text-center"
                 >
-                  <p className="font-bold text-primary">🎉 뱃지 잠금 해제! 🎉</p>
-                  <p className="text-sm">5개 이상의 스탬프를 모아 뱃지를 획득했어요!</p>
+                  <p className="font-bold text-primary">🎉 {newlyAwardedBadge.charAt(0).toUpperCase() + newlyAwardedBadge.slice(1)} 뱃지 잠금 해제! 🎉</p>
+                  <p className="text-sm">{newlyAwardedBadge} 뱃지를 획득했어요! 다음 목표를 향해 달려보세요!</p>
                 </motion.div>
               )}
             </motion.div>
