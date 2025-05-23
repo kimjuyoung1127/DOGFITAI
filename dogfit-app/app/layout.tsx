@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
+import NavigationBar from "@/components/NavigationBar";
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -21,7 +22,8 @@ export default function RootLayout({
     <html lang="ko" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-          <main className="min-h-screen bg-[#FFF6EE]">{children}</main>
+          <main className="min-h-screen bg-[#FFF6EE] pb-16 md:pb-0">{children}</main>
+          <NavigationBar />
         </ThemeProvider>
       </body>
     </html>
