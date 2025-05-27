@@ -52,7 +52,7 @@ export default function Home() {
 
             <Link href="/form" className="block">
               <Button className="w-full text-lg py-6" size="lg">
-                시작하기
+                강아지 정보 입력하러 가기
               </Button>
             </Link>
           </div>
