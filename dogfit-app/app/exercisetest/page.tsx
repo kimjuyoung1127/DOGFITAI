@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PawPrintLoading } from "@/components/ui/paw-print-loading"
 
+export const dynamic = 'force-dynamic'
+
 // 키 번역을 위한 매핑 객체
 const keyTranslations: { [key: string]: string } = {
   summary: "분석 요약",
