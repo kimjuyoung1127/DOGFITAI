@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react" // Added Suspense here
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,7 +9,8 @@ import Link from "next/link"
 import { supabase } from "@/lib/supabase/supabaseClient"
 import { Provider } from "@supabase/supabase-js"
 
-export default function LoginPage() {
+// Define the new inner component
+function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pendingData = searchParams.get('pending_data') === 'true'
@@ -180,4 +181,13 @@ export default function LoginPage() {
       </Card>
     </div>
   )
-} 
+}
+
+// Modified LoginPage to use Suspense
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div>Loading page...</div>}>
+      <LoginContent />
+    </Suspense>
+  );
+}
