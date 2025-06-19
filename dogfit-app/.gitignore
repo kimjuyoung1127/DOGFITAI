@@ -26,4 +26,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.
 
-gen-lang-client-0617005764-6dd8c832a4d3
+gen-lang-client-0617005764-8769de3f1f44.json
+gen-lang-client-*.json
+*.json
