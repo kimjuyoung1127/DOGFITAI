@@ -245,10 +245,10 @@ export default function CompletePage({ params }: { params: { id: string } }) {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col justify-center p-6 pt-0">
-            <Link href="/" className="w-full">
+            <Link href="/profile" className="w-full">
               <Button className="flex items-center gap-2 w-full">
                 <Home className="h-4 w-4" />
-                홈으로 돌아가기
+                프로필로 돌아가기
               </Button>
             </Link>
             <Link href="/history" className="w-full mt-4">

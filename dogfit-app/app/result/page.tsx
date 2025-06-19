@@ -29,20 +29,39 @@ import Link from "next/link"
 
 // public/images/exercises 내부에 존재하는 이미지 파일명 목록 (확장자 제외)
 const availableImages = new Set([
-  "agility-pivot_fullBody",
-  "balance-donut_fullBody",
-  "balance-fitbone-stand_fullBody",
+  "back-arch-stretch_bodyweight",
+  "balance-donut-fullBody",
+  "balance-fitbone-stand-fullBody",
+  "block-rear-stand_rearPawsElevated",
+  "bodyweight-sit-to-stand_fullBody",
+  "cavaletti-walk_fullBody",
   "circuit-roll_floorOnly",
   "climbing-lowstep_frontPawsOnly",
+  "cone-pivot_fullBody",
+  "cone-weave_fullBody",
   "confidence-box_fullBody",
   "core-elevated-push_rearPawsElevated",
   "core-sitstand_bodyweight",
+  "core-twist-disc_wholebody",
+  // "default.png"는 Set에 포함하지 않고, 매칭되는 이미지가 없을 때 사용합니다.
   "donut-balance_frontPawsOnly",
+  "donut-ball-balance_frontPawsOnly",
+  "down-to-sit_bodyweight",
+  "fitbone-frontonly_frontPawsOnly",
   "fitbone-static-stand_fullBody",
   "focus-touchmat_bodyweight",
+  "hind-leg-raises_rearPawsElevated",
   "jump-hurdle_bodyweight",
+  "pause-hold-yogablock_bodyweight",
+  "side-stretch_bodyweight",
+  "sit-down-stand_bodyweight",
+  "sit-to-stand_bodyweight",
+  "staggered-cushion-stand_wholebody",
   "strength-cavaletti-step_fullBody",
   "strength-plank_fullBody",
+  "stretch-frontlegs_bodyweight",
+  "stretch-hindlegs_donut",
+  "wobble-mat-hold_bodyweight"
 ]);
 
 // 운동 이미지 파일명 추론 유틸 함수
@@ -55,54 +74,60 @@ function getExerciseImageFilename(exercise: Exercise) {
     bodyweight: 'bodyweight',
   };
 
-  // contact 값이 올바른지 체크 (없거나 잘못된 값이면 기본값 사용)
   const contactKey = typeof exercise.contact === "string" && suffixMap.hasOwnProperty(exercise.contact)
     ? exercise.contact
     : "bodyweight";
   const suffix = suffixMap[contactKey as keyof typeof suffixMap];
 
-  // 파일명 후보 리스트
-  const imageFiles = [
-    "agility-pivot_fullBody",
-    "balance-donut_fullBody",
-    "balance-fitbone-stand_fullBody",
-    "donut-balance_frontPawsOnly",
-    "fitbone-static-stand_fullBody",
-    "circuit-roll_floorOnly",
-    "climbing-lowstep_frontPawsOnly",
-    "confidence-box_fullBody",
-    "core-elevated-push_rearPawsElevated",
-    "core-sitstand_bodyweight",
-    "donut-balance_frontPawsOnly",
-    "fitbone-static-stand_fullBody",
-    "focus-touchmat_bodyweight",
-    "jump-hurdle_bodyweight",
-    "strength-cavaletti-step_fullBody",
-    "strength-plank_fullBody",
-  ];
-
-  // 일부만 일치하는 파일명 찾기 (하이픈/언더스코어/대소문자 무시)
   const normalized = (str: string) => str.replace(/[-_]/g, '').toLowerCase();
 
-  // 1. base와 suffix 모두 포함 (가장 우선)
-  let match = imageFiles.find(filename =>
-    normalized(filename).includes(normalized(base)) &&
-    normalized(filename).includes(normalized(suffix))
-  );
-  // 2. base만 포함
-  if (!match) {
-    match = imageFiles.find(filename =>
-      normalized(filename).includes(normalized(base))
-    );
+  let bestMatch: string | null = null;
+  let maxMatchScore = -1;
+
+  for (const imageName of availableImages) {
+    const normalizedImageName = normalized(imageName);
+    const normalizedBase = normalized(base);
+    const normalizedSuffix = normalized(suffix);
+
+    let currentScore = 0;
+    let baseFound = false;
+    let suffixFound = false;
+
+    // 1. base와 suffix 모두 포함 (가장 높은 점수)
+    if (normalizedImageName.includes(normalizedBase) && normalizedImageName.includes(normalizedSuffix)) {
+      currentScore = 2; // 높은 우선순위
+      baseFound = true;
+      suffixFound = true;
+    } 
+    // 2. base만 포함
+    else if (normalizedImageName.includes(normalizedBase)) {
+      currentScore = 1;
+      baseFound = true;
+    }
+    // 3. suffix만 포함
+    else if (normalizedImageName.includes(normalizedSuffix)) {
+      currentScore = 1;
+      suffixFound = true;
+    }
+
+    // 더 정확한 매칭 (예: base가 더 길게 일치하는 경우)을 위해 점수 조정 가능성
+    if (baseFound) {
+        // base 문자열이 이미지 이름 내에서 얼마나 정확히 일치하는지 (부분 문자열보다는 전체 단어 선호)
+        if (normalizedImageName.split(/[-_]/).includes(normalizedBase.split(/[-_]/)[0])) currentScore += 0.5;
+    }
+    if (suffixFound) {
+        if (normalizedImageName.split(/[-_]/).includes(normalizedSuffix.split(/[-_]/)[normalizedSuffix.split(/[-_]/).length -1])) currentScore += 0.5;
+    }
+
+
+    if (currentScore > maxMatchScore) {
+      maxMatchScore = currentScore;
+      bestMatch = imageName;
+    }
   }
-  // 3. suffix만 포함
-  if (!match) {
-    match = imageFiles.find(filename =>
-      normalized(filename).includes(normalized(suffix))
-    );
-  }
-  if (match) {
-    return `/images/exercises/${match}.png`;
+
+  if (bestMatch) {
+    return `/images/exercises/${bestMatch}.png`;
   }
   return `/images/exercises/default.png`;
 }

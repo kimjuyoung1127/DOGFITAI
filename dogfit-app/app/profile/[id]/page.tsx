@@ -226,7 +226,7 @@ export default function AnalysisPage() {
       {/* 5. 액션 버튼 */}
       <div className="flex flex-col gap-2 mt-2">
         <Button className="bg-blue-500 text-white" onClick={handleRetryRecommendation}>
-          운동 추천 다시 받기
+          운동 추천 받기
         </Button>
         <Button variant="outline" onClick={() => router.push("/result")}>
           결과 페이지로 이동
