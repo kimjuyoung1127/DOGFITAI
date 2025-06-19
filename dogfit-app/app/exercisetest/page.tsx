@@ -6,6 +6,53 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PawPrintLoading } from "@/components/ui/paw-print-loading"
 
+// 키 번역을 위한 매핑 객체
+const keyTranslations: { [key: string]: string } = {
+  summary: "분석 요약",
+  recommendations: "추천 운동",
+  id: "아이디",
+  name: "이름",
+  description: "설명",
+  difficulty: "난이도",
+  duration: "운동 시간(분)",
+  equipment: "필요 기구",
+  steps: "운동 단계",
+  step: "단계 설명",
+  stepDuration: "단계별 지속 시간(초)",
+  totalDuration: "총 운동 시간(초)",
+  status: "상태",
+  benefits: "운동 효과",
+  contact: "주요 접촉 부위",
+  // API 응답에 있을 수 있는 추가적인 키들 (필요시 추가)
+  error: "오류",
+  detail: "상세 정보",
+  message: "메시지",
+  // dogProfile 관련 키 (만약 API가 프로필 정보도 같이 내려준다면)
+  // age: "나이",
+  // weight: "체중",
+  // gender: "성별",
+  // breed: "견종",
+  // preferredActivities: "선호 활동",
+  // availableEquipment: "보유 기구",
+  // healthValues: "건강 수치",
+  // performanceValues: "운동 능력치"
+};
+
+// 객체의 키를 재귀적으로 번역하는 함수
+const translateObjectKeys = (obj: any, translationMap: { [key: string]: string }): any => {
+  if (Array.isArray(obj)) {
+    return obj.map(item => translateObjectKeys(item, translationMap));
+  }
+  if (typeof obj === 'object' && obj !== null) {
+    return Object.keys(obj).reduce((acc, key) => {
+      const translatedKey = translationMap[key] || key; // 매핑에 없으면 원래 키 사용
+      acc[translatedKey] = translateObjectKeys(obj[key], translationMap);
+      return acc;
+    }, {} as any);
+  }
+  return obj;
+};
+
 export default function ExerciseTestPage() {
   const searchParams = useSearchParams()
   const profileId = searchParams.get('profileId')
@@ -143,7 +190,7 @@ export default function ExerciseTestPage() {
               {/* JSON 데이터 표시 */}
               <div className="bg-gray-50 border border-gray-200 rounded-md p-4 overflow-auto max-h-[500px]">
                 <pre className="text-xs font-mono whitespace-pre-wrap">
-                  {JSON.stringify(data, null, 2)}
+                  {JSON.stringify(translateObjectKeys(data, keyTranslations), null, 2)}
                 </pre>
               </div>
             </div>
