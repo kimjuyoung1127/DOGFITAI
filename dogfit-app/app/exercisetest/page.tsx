@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -55,10 +55,11 @@ const translateObjectKeys = (obj: any, translationMap: { [key: string]: string }
   return obj;
 };
 
-export default function ExerciseTestPage() {
-  const searchParams = useSearchParams()
-  const profileId = searchParams.get('profileId')
-  
+interface ExerciseTestContentProps {
+  profileId: string | null;
+}
+
+function ExerciseTestContent({ profileId }: ExerciseTestContentProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<any>(null)
@@ -222,5 +223,16 @@ export default function ExerciseTestPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function ExerciseTestPage() {
+  const searchParams = useSearchParams()
+  const profileId = searchParams.get('profileId')
+
+  return (
+    <Suspense fallback={<div className="flex flex-col items-center justify-center min-h-screen"><PawPrintLoading /><p className="mt-4 text-gray-600">프로필 정보 로딩 중...</p></div>}>
+      <ExerciseTestContent profileId={profileId} />
+    </Suspense>
   )
 }
