@@ -26,13 +26,13 @@ export const runtime = 'edge';
 
   // If you were to use VertexAI directly (currently commented out):
   // import { VertexAI } from '@google-cloud/vertexai'; // Make sure this import is active if using the client
-  // const vertex_ai = new VertexAI({
-  //   project: process.env.GCP_PROJECT_ID || 'YOUR_PROJECT_ID', // Replace with actual project ID
-  //   location: process.env.GCP_LOCATION || 'YOUR_LOCATION',   // Replace with actual location
-  //   credentials // Pass the parsed credentials here if available
-  // });
+  const vertex_ai = new VertexAI({ // Assuming VertexAI is imported/required
+    project: process.env.GCP_PROJECT_ID || 'YOUR_PROJECT_ID', // Replace with actual project ID
+    location: process.env.GCP_LOCATION || 'YOUR_LOCATION',   // Replace with actual location
+    credentials // Pass the parsed credentials here if available
+  });
 
-  // const model = vertex_ai.getGenerativeModel({ /* ... model config ... */ });
+  const model = vertex_ai.getGenerativeModel({ /* ... model config ... */ }); // Example model
 */
 
 
