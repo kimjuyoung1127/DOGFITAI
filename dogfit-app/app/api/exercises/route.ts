@@ -27,7 +27,7 @@ export const runtime = 'edge';
   // If you were to use VertexAI directly (currently commented out):
   // import { VertexAI } from '@google-cloud/vertexai'; // Make sure this import is active if using the client
   const vertex_ai = new VertexAI({ // Assuming VertexAI is imported/required
-    project: process.env.GCP_PROJECT_ID || 'YOUR_PROJECT_ID', // Replace with actual project ID
+    project: process.env.GCP_PROJECT_ID || 'gen-lang-client-0617005764', // Replace with actual project ID
     location: process.env.GCP_LOCATION || 'YOUR_LOCATION',   // Replace with actual location
     credentials // Pass the parsed credentials here if available
   });
@@ -68,22 +68,36 @@ export const runtime = 'edge';
    5) POST 핸들러
 ------------------------------------------------------------------ */
 export async function POST(request: Request) {
-  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
-    console.warn('Warning: GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable is not set. API will not be able to authenticate with Google Cloud if real functionality is enabled.');
+  console.log(`Received request: ${request.method} ${request.url}`);
+  try {
+    if (!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+      console.error('Error: GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable is not set. Authentication will fail if real API functionality is enabled.');
+      // For now, let it fall through to the 503 for the stub.
+    }
+    // Original functionality is commented out.
+    // try {
+    //   const { profileId } = await request.json();
+    //   // ... rest of the original code
+    // } catch (e) {
+    //   // ... original error handling
+    // }
+    return NextResponse.json({ message: 'API endpoint temporarily disabled due to build incompatibility.', success: false }, { status: 503 });
+  } catch (error: any) {
+    console.error(`Error in POST /api/exercises:`, error);
+    return NextResponse.json({ message: error.message || 'An unexpected error occurred during request processing.', success: false, errorDetails: String(error) }, { status: 500 });
   }
-  // Original functionality is commented out.
-  // try {
-  //   const { profileId } = await request.json();
-  //   // ... rest of the original code
-  // } catch (e) {
-  //   // ... original error handling
-  // }
-  return NextResponse.json({ message: 'API endpoint temporarily disabled due to build incompatibility.', success: false }, { status: 503 });
 }
 
 export async function GET(request: Request) {
-  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
-    console.warn('Warning: GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable is not set. API will not be able to authenticate with Google Cloud if real functionality is enabled.');
+  console.log(`Received request: ${request.method} ${request.url}`);
+  try {
+    if (!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+      console.error('Error: GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable is not set (GET). Authentication will fail if real API functionality is enabled.');
+    }
+    // Original functionality is commented out.
+    return NextResponse.json({ message: 'API endpoint temporarily disabled due to build incompatibility.', success: false }, { status: 503 });
+  } catch (error: any) {
+    console.error(`Error in GET /api/exercises:`, error);
+    return NextResponse.json({ message: error.message || 'An unexpected error occurred during request processing.', success: false, errorDetails: String(error) }, { status: 500 });
   }
-  return NextResponse.json({ message: 'API endpoint temporarily disabled due to build incompatibility.', success: false }, { status: 503 });
 }
