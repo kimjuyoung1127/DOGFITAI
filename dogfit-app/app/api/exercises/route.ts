@@ -31,8 +31,6 @@ export const runtime = 'edge';
     location: process.env.GCP_LOCATION || 'YOUR_LOCATION',   // Replace with actual location
     credentials // Pass the parsed credentials here if available
   });
-
-  const model = vertex_ai.getGenerativeModel({ /* ... model config ... */ }); // Example model
 */
 
 
