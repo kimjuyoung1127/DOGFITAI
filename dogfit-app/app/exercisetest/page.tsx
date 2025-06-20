@@ -231,7 +231,11 @@ export default function ExerciseTestPage() {
   const profileId = searchParams.get('profileId')
 
   return (
-    <Suspense fallback={<div className="flex flex-col items-center justify-center min-h-screen"><PawPrintLoading /><p className="mt-4 text-gray-600">프로필 정보 로딩 중...</p></div>}>
+    <Suspense fallback={
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+        <p>프로필 정보 로딩 중...</p> {/* Simplified static fallback */}
+      </div>
+    }>
       <ExerciseTestContent profileId={profileId} />
     </Suspense>
   )
