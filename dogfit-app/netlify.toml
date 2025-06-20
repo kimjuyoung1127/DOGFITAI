@@ -1,0 +1,24 @@
+[build]
+  command = "next build"
+  publish = ".next"
+
+[dev]
+  command = "next dev"
+  port = 3000
+  publish = ".next"
+  ## framework = "#static" # Set framework to static for simple HTML/CSS/JS projects
+
+## The following redirect is intended for use with most SPAs that handle routing internally.
+# [[redirects]]
+#   from = "/*"
+#   to = "/index.html"
+#   status = 200
+
+## (optional) Settings for Netlify Dev
+## https://github.com/netlify/cli/blob/main/docs/netlify-dev.md#project-detection
+#[dev]
+#  command = "yarn start" # Command to start your dev server
+#  port = 3000 # Port that Netlify Dev will use to connect to the Dev server
+#  publish = "dist" # If you use a _redirect file, provide the path to your static content folder
+
+## more info on configuring this file: https://docs.netlify.com/configure-builds/file-based-configuration/
