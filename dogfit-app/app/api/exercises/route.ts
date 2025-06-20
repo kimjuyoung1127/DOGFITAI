@@ -5,6 +5,76 @@ import { NextResponse } from 'next/server';
 
 export const runtime = 'edge';
 
+const analyzePrompt = `
+당신은 반려견 피트니스 및 재활 분야에서 10년 이상 경력을 가진 전문가입니다.
+아래 강아지의 건강 상태, 운동 능력, 보유 기구, 견종 특성, 최근 운동 기록을 종합적으로 분석하여
+보호자가 이해하기 쉬운 **분석 요약**을 작성해주세요.
+
+강아지 정보:
+- 이름: {name}
+- 나이: {age}개월
+- 견종: {breed}
+- 체중: {weight}kg
+- 건강 이슈: {healthIssues}
+- 보유 기구: {equipment}
+- 주요 운동 능력치: {performanceValues}
+- 최근 운동 기록: {exerciseHistory}
+
+📌 반드시 아래 조건을 지켜주세요:
+1. **강점**: 평균 대비 뛰어난 능력치, 건강상 강점, 운동 수행에서 잘한 점을 구체적으로 언급
+2. **약점/개선 포인트**: 평균 이하이거나 민감한 부위, 개선이 필요한 운동 능력, 주의해야 할 건강 이슈를 구체적으로 언급
+3. **개선 제안**: 약점 개선을 위한 구체적이고 실현 가능한 운동 방향성, 보호자 행동 팁 제시
+4. **주의사항**: 운동 시 반드시 유의해야 할 점, 피해야 할 동작, 보호자에게 필요한 안내
+5. **분석 요약은 3~5문장 이내로 간결하게 작성** (불필요한 해설·사족 금지)
+6. **분석 요약은 반드시 'summary' 필드에 문자열로 포함**
+7. **분석 요약은 반드시 한글로 작성하고, 모든 영어 용어는 쉬운 한국어로 풀어쓰거나 적절한 한국어 용어로 번역**`;
+
+const recommendPrompt = `
+당신은 강아지 피트니스 분야에서 10년 이상의 경험을 가진 트레이너이며,
+동물 생리학 및 병리학을 전공한 전문가입니다.
+해부학·운동 생리학·행동학·재활 트레이닝에 기반하여
+각 강아지의 건강 상태, 기구 보유 여부, 운동 능력, 견종 특성을 종합적으로 고려한
+**운동 3가지를 추천**하고, 분석 요약도 함께 제공해주세요.
+
+// 중요: recommendPrompt는 이전과 동일하게 영어 키를 사용합니다.
+// recommendPrompt 결과는 반드시 한글로 작성하고, 모든 영어 용어는 쉬운 한국어로 풀어쓰거나 적절한 한국어 용어로 번역
+
+📌 필수 규칙
+1. 관절·척추·심장 등 민감 부위는 무리 없는 방식으로 강화
+2. 기구가 있으면 활용, 없으면 맨몸(body-weight) 운동
+3. 총 3가지 운동은 서로 다른 목적(예: 균형 / 근력 / 유연성)
+4. **steps**는 단계별 지침 + stepDuration(초) 포함, 최소 5단계
+5. 각 운동 **totalDuration** = steps stepDuration 합계 (300~900초)
+6. **status**: "notStarted" 로 초기화
+7. **contact**: frontlegs | hindlegs | wholebody | bodyweight
+8. 반드시 **JSON 객체만** 반환 (추가 텍스트 금지)
+9. 노즈워크·산책 같은 일반적 활동은 제외
+10. 약점을 회피하지 말고, 안전 범위 내에서 강화 전략 제시
+
+📦 반환 형식:
+{
+  "summary": "... (3~5문장)",
+  "recommendations": [
+    {
+      "id": "donut-balance",
+      "name": "Donut Balance",
+      "description": "...",
+      "difficulty": "easy" | "medium" | "hard",
+      "duration": 10,          // 분
+      "equipment": ["donut_ball"],
+      "steps": [
+        { "step": "...", "stepDuration": 60 },
+        ...
+      ],
+      "totalDuration": 420,    // 초
+      "status": "notStarted",
+      "benefits": ["균형감각", "..."],
+      "contact": "frontlegs"
+    },
+    ... (총 3개)
+  ]
+}`;
+
 /*
   Vertex AI Initialization Example using GOOGLE_APPLICATION_CREDENTIALS_JSON:
 
@@ -52,9 +122,9 @@ export const runtime = 'edge';
 // });
 
 /* ------------------------------------------------------------------
-   3) 프롬프트 템플릿 (Commented out)
+   3) 프롬프트 템플릿 (Commented out) - This section is now replaced by the constants above
 ------------------------------------------------------------------ */
-// const analyzePrompt = `...`;
+// const analyzePrompt = `...`; // This line and the one below were previously here
 // const recommendPrompt = `...`;
 
 /* ------------------------------------------------------------------
