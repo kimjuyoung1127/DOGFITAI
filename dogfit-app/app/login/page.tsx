@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,94 +9,97 @@ import Link from "next/link"
 import { supabase } from "@/lib/supabase/supabaseClient"
 import { Provider } from "@supabase/supabase-js"
 
-export default function LoginPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const pendingData = searchParams.get('pending_data') === 'true'
-  const redirectPath = searchParams.get('redirect') || '/profile'
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
+interface LoginContentProps {
+  pendingDataInitially: boolean;
+  redirectPathInitially: string;
+}
+
+function LoginContent({ pendingDataInitially, redirectPathInitially }: LoginContentProps) {
+  const router = useRouter();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
-      })
+      });
 
       if (error) {
-        alert("로그인 실패: " + error.message)
-        setIsLoading(false)
-        return
+        alert("로그인 실패: " + error.message);
+        setIsLoading(false);
+        return;
       }
 
-      router.push(`${redirectPath}${pendingData ? '?pending_data=true' : ''}`)
+      router.push(`${redirectPathInitially}${pendingDataInitially ? '?pending_data=true' : ''}`);
     } catch (e) {
-      console.error("로그인 중 오류 발생:", e)
-      alert("로그인 중 오류가 발생했습니다.")
-      setIsLoading(false)
+      console.error("로그인 중 오류 발생:", e);
+      alert("로그인 중 오류가 발생했습니다.");
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleGoogleLogin = async () => {
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?redirect=${redirectPath}${pendingData ? '&pending_data=true' : ''}`,
+          redirectTo: `${window.location.origin}/auth/callback?redirect=${redirectPathInitially}${pendingDataInitially ? '&pending_data=true' : ''}`,
         }
-      })
+      });
       
       if (error) {
-        alert("Google 로그인 실패: " + error.message)
+        alert("Google 로그인 실패: " + error.message);
       }
     } catch (e) {
-      console.error("Google 로그인 중 오류 발생:", e)
-      alert("로그인 중 오류가 발생했습니다.")
+      console.error("Google 로그인 중 오류 발생:", e);
+      alert("로그인 중 오류가 발생했습니다.");
     }
-  }
+  };
 
   const handleKakaoLogin = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "kakao",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?redirect=${redirectPath}${pendingData ? '&pending_data=true' : ''}`,
+          redirectTo: `${window.location.origin}/auth/callback?redirect=${redirectPathInitially}${pendingDataInitially ? '&pending_data=true' : ''}`,
         }
-      })
+      });
 
       if (error) {
-        alert("Kakao 로그인 실패: " + error.message)
+        alert("Kakao 로그인 실패: " + error.message);
       }
     } catch (e) {
-      console.error("Kakao 로그인 중 오류 발생:", e)
-      alert("로그인 중 오류가 발생했습니다.")
+      console.error("Kakao 로그인 중 오류 발생:", e);
+      alert("로그인 중 오류가 발생했습니다.");
     }
-  }
+  };
 
   const handleNaverLogin = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "naver" as Provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?redirect=${redirectPath}${pendingData ? '&pending_data=true' : ''}`,
+          redirectTo: `${window.location.origin}/auth/callback?redirect=${redirectPathInitially}${pendingDataInitially ? '&pending_data=true' : ''}`,
         }
-      })
+      });
 
       if (error) {
-        alert("Naver 로그인 실패: " + error.message)
+        alert("Naver 로그인 실패: " + error.message);
       }
     } catch (e) {
-      console.error("Naver 로그인 중 오류 발생:", e)
-      alert("로그인 중 오류가 발생했습니다.")
+      console.error("Naver 로그인 중 오류 발생:", e);
+      alert("로그인 중 오류가 발생했습니다.");
     }
-  }
+  };
 
   return (
     <div className="container flex flex-col items-center justify-center min-h-screen p-4">
-      {pendingData && (
+      {pendingDataInitially && (
         <div className="bg-orange-50 border-l-4 border-orange-500 p-4 mb-4">
           <p className="text-orange-700">
             <strong>입력 중인 데이터가 있습니다.</strong> 로그인하시면 이전에 입력하던 내용을 이어서 진행할 수 있습니다.
@@ -131,6 +134,7 @@ export default function LoginPage() {
             </Link>
           </div>
           <div className="space-y-2 mt-6">
+            {/* Google Button */}
             <Button
               className="w-full flex items-center justify-center border border-gray-300"
               style={{
@@ -147,6 +151,7 @@ export default function LoginPage() {
               <img src="/google-logo.png" alt="Google" className="mr-2" />
               Google로 로그인
             </Button>
+            {/* Kakao Button */}
             <Button
               className="w-full flex items-center justify-center"
               style={{
@@ -161,6 +166,7 @@ export default function LoginPage() {
               <img src="/kakao-logo.png" alt="Kakao" className="mr-2" />
               카카오로 로그인
             </Button>
+            {/* Naver Button */}
             <Button
               className="w-full flex items-center justify-center"
               style={{
@@ -179,5 +185,20 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
-  )
-} 
+  );
+}
+
+export default function LoginPage() {
+  const searchParams = useSearchParams();
+  const pendingDataInitially = searchParams.get('pending_data') === 'true';
+  const redirectPathInitially = searchParams.get('redirect') || '/profile';
+
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><p>페이지를 불러오는 중...</p></div>}>
+      <LoginContent
+        pendingDataInitially={pendingDataInitially}
+        redirectPathInitially={redirectPathInitially}
+      />
+    </Suspense>
+  );
+}
