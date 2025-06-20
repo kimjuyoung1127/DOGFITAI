@@ -1,4 +1,5 @@
-"use client"
+"use client";
+export const runtime = 'edge';
 
 import React from 'react'
 import { useState, useEffect, useRef } from "react" // useRef import 추가

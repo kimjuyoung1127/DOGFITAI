@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,7 +20,7 @@ import { Clock } from "lucide-react"
 
 // 개발 테스트 모드 설정 (true로 설정하면 테스트 버튼이 표시됨)
 
-export default function ProfilePage() {
+function ProfilePageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const hasPendingData = searchParams.get('pending_data') === 'true'
@@ -578,4 +578,12 @@ export default function ProfilePage() {
       )}
     </div>
   )
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={<div>Loading profile...</div>}>
+      <ProfilePageContent />
+    </Suspense>
+  );
 }

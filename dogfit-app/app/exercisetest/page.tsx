@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -55,7 +55,7 @@ const translateObjectKeys = (obj: any, translationMap: { [key: string]: string }
   return obj;
 };
 
-export default function ExerciseTestPage() {
+function ExerciseTestPageContent() {
   const searchParams = useSearchParams()
   const profileId = searchParams.get('profileId')
   
@@ -223,4 +223,12 @@ export default function ExerciseTestPage() {
       </Card>
     </div>
   )
+}
+
+export default function ExerciseTestPage() {
+  return (
+    <Suspense fallback={<div>Loading exercise test page...</div>}>
+      <ExerciseTestPageContent />
+    </Suspense>
+  );
 }

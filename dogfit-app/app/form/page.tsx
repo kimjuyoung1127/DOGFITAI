@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -31,7 +31,8 @@ import { supabase } from "@/lib/supabase/supabaseClient"
 
 const stepNames = ["기본 정보", "건강 상태", "운동 능력", "활동 선호도", "운동기구"];
 
-export default function DogInfoForm() {
+// Define the new inner component
+function DogInfoFormContent() {
   const router = useRouter()
   const [step, setStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
@@ -1254,4 +1255,13 @@ export default function DogInfoForm() {
       </div>
     </TooltipProvider>
   )
+}
+
+// Modified DogInfoForm to use Suspense
+export default function DogInfoForm() {
+  return (
+    <Suspense fallback={<div>Loading form...</div>}>
+      <DogInfoFormContent />
+    </Suspense>
+  );
 }
